@@ -63,10 +63,20 @@ namespace MobiFlight
 
             Log.Instance.log("Command: SetShiftRegisterPin <" + (int)MobiFlightModule.Command.SetShiftRegisterPins + "," +
                                                       this.ModuleNumber + "," +
-                                                      outputPins + "," +
+                                                      pinsOnly + "," +
                                                       value + ";>", LogSeverity.Debug);
             // Send command
             CmdMessenger.SendCommand(command);
+        }
+
+        public void Stop()
+        {
+            List<String> pins = new List<string>();
+            for (int i = 0; i != NumberOfShifters*8; i++)
+                pins.Add(i.ToString());
+
+            String pinString = string.Join("|", pins);
+            Display(pinString, "0");
         }
     }
 }

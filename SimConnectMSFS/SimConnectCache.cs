@@ -37,6 +37,7 @@ namespace MobiFlight.SimConnectMSFS
         /// SimConnect object
         private SimConnect m_oSimConnect = null;
 
+        private bool _simConnectConnected = false;
         private bool _connected = false;
 
         public Dictionary<String, List<Tuple<String, uint>>> Events { get; private set; }
@@ -48,10 +49,10 @@ namespace MobiFlight.SimConnectMSFS
         private List<String> LVars = new List<String>();
         private String ResponseStatus = "NEW";
 
-        /* public void Clear()
-         {
-             throw new NotImplementedException();
-         }*/
+        public void Clear()
+        {
+             // do nothing
+        }
 
         public void SetHandle(IntPtr handle)
         {
@@ -129,6 +130,19 @@ namespace MobiFlight.SimConnectMSFS
 
         public bool Connect()
         {
+            // If we have already established
+            // a connection with SimConnect
+            // but we are still waiting for the
+            // WASM module to become available
+            if (_simConnectConnected)
+            {
+                WasmModuleClient.Ping(m_oSimConnect);
+                return true;
+            }
+
+
+            // Here we are only when we try
+            // to connect to SimConnect first
             loadEventPresets();
 
             try
@@ -153,8 +167,7 @@ namespace MobiFlight.SimConnectMSFS
 
         private void SimConnect_OnRecvOpen(SimConnect sender, SIMCONNECT_RECV_OPEN data)
         {
-            _connected = true;
-
+            _simConnectConnected = true;
             // register Events
             foreach (string GroupKey in Events.Keys) { 
                 foreach (Tuple<string, uint> eventItem in Events[GroupKey])
@@ -170,6 +183,8 @@ namespace MobiFlight.SimConnectMSFS
             (sender).OnRecvClientData += SimConnectCache_OnRecvClientData;
 
             Connected?.Invoke(this, null);
+
+            WasmModuleClient.Ping(sender);
         }
 
         private void InitializeClientDataAreas(SimConnect sender)
@@ -202,7 +217,8 @@ namespace MobiFlight.SimConnectMSFS
         }
 
         internal void Start()
-        {   
+        {
+            WasmModuleClient.SetConfig(m_oSimConnect, "MAX_VARS_PER_FRAME", "30");
         }
 
         private void SimConnectCache_OnRecvClientData(SimConnect sender, SIMCONNECT_RECV_CLIENT_DATA data)
@@ -218,7 +234,13 @@ namespace MobiFlight.SimConnectMSFS
             else
             {
                 var simData = (ResponseString)(data.dwData[0]);
-                if(simData.Data == "MF.LVars.List.Start")
+
+                if (simData.Data == "MF.Pong")
+                {
+                    _connected = true;
+                    Connected?.Invoke(this, null);
+                }
+                if (simData.Data == "MF.LVars.List.Start")
                 {
                     ResponseStatus = "LVars.List.Receiving";
                     LVars.Clear();
@@ -256,7 +278,11 @@ namespace MobiFlight.SimConnectMSFS
         private void SimConnect_OnRecvException(SimConnect sender, SIMCONNECT_RECV_EXCEPTION data)
         {
             SIMCONNECT_EXCEPTION eException = (SIMCONNECT_EXCEPTION)data.dwException;
-            Log.Instance.log("SimConnectCache::Exception " + eException.ToString(), LogSeverity.Error);
+            if (eException == SIMCONNECT_EXCEPTION.ALREADY_CREATED) {
+                Log.Instance.log("SimConnectCache::Exception " + eException.ToString(), LogSeverity.Debug);
+            }
+            else
+                Log.Instance.log("SimConnectCache::Exception " + eException.ToString(), LogSeverity.Error);
         }
 
         public bool Disconnect()
@@ -270,16 +296,26 @@ namespace MobiFlight.SimConnectMSFS
                 m_oSimConnect.Dispose();
                 m_oSimConnect = null;
             }
-            _connected = false;
 
-            Closed?.Invoke(this, null);
-            
+            if (_simConnectConnected || _connected)
+            {
+                _simConnectConnected = false;
+                _connected = false;
+
+                Closed?.Invoke(this, null);
+            }
+
             return true;
         }
 
         public bool IsConnected()
         {
             return _connected;
+        }
+
+        public bool IsSimConnectConnected()
+        {
+            return _simConnectConnected;
         }
 
         public void setEventID(string eventID)
@@ -311,6 +347,9 @@ namespace MobiFlight.SimConnectMSFS
         public float GetSimVar(String SimVarName)
         {
             float result = 0;
+            if (!IsConnected()) 
+                return result;
+
             if (!SimVars.Exists(lvar => lvar.Name == SimVarName))
             {
                 RegisterSimVar(SimVarName);

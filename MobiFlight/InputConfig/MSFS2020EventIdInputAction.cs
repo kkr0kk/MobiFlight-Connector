@@ -7,9 +7,6 @@ namespace MobiFlight.InputConfig
 {
     public class MSFS2020EventIdInputAction : InputAction, ICloneable
     {
-        const Int16 BaseOffset = 0x3110;
-        const Int16 ParamOffset = 0x3114;
-
         public new const String Label = "MSFS2020 - Events";
         public new const String CacheType = "SimConnect";
         public const String TYPE = "MSFS2020EventIdInputAction";
@@ -42,13 +39,11 @@ namespace MobiFlight.InputConfig
         }
 
         public override void execute(
-            FSUIPC.FSUIPCCacheInterface fsuipcCache,
-            SimConnectMSFS.SimConnectCacheInterface simConnectCache,
-            MobiFlightCacheInterface moduleCache,
+            CacheCollection cacheCollection,
             InputEventArgs args,
             List<ConfigRefValue> configRefs)
         {
-            simConnectCache.setEventID(EventId);
+            cacheCollection.simConnectCache.setEventID(EventId);
         }
 
         public override bool Equals(object obj)

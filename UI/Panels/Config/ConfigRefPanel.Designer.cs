@@ -35,12 +35,17 @@
             this.configRefPanelItem2 = new MobiFlight.UI.Panels.Config.ConfigRefPanelItem();
             this.configRefPanelItem1 = new MobiFlight.UI.Panels.Config.ConfigRefPanelItem();
             this.panel1 = new System.Windows.Forms.Panel();
-            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.label2 = new System.Windows.Forms.Label();
+            this.panel2 = new System.Windows.Forms.Panel();
+            this.addReferenceButton = new System.Windows.Forms.Button();
             this.noConfigRefsPanel = new System.Windows.Forms.Panel();
-            this.textBox2 = new System.Windows.Forms.TextBox();
+            this.label1 = new System.Windows.Forms.Label();
+            this.panel3 = new System.Windows.Forms.Panel();
             this.configRefItemPanel.SuspendLayout();
             this.panel1.SuspendLayout();
+            this.panel2.SuspendLayout();
             this.noConfigRefsPanel.SuspendLayout();
+            this.panel3.SuspendLayout();
             this.SuspendLayout();
             // 
             // configRefItemPanel
@@ -74,50 +79,60 @@
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.label2);
+            this.panel1.Controls.Add(this.panel2);
             resources.ApplyResources(this.panel1, "panel1");
-            this.panel1.Controls.Add(this.textBox1);
             this.panel1.Name = "panel1";
             // 
-            // textBox1
+            // label2
             // 
-            resources.ApplyResources(this.textBox1, "textBox1");
-            this.textBox1.BackColor = System.Drawing.SystemColors.ControlLightLight;
-            this.textBox1.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox1.Cursor = System.Windows.Forms.Cursors.Default;
-            this.textBox1.Name = "textBox1";
-            this.textBox1.ReadOnly = true;
-            this.textBox1.TabStop = false;
+            resources.ApplyResources(this.label2, "label2");
+            this.label2.Name = "label2";
+            // 
+            // panel2
+            // 
+            this.panel2.Controls.Add(this.addReferenceButton);
+            resources.ApplyResources(this.panel2, "panel2");
+            this.panel2.Name = "panel2";
+            // 
+            // addReferenceButton
+            // 
+            resources.ApplyResources(this.addReferenceButton, "addReferenceButton");
+            this.addReferenceButton.Name = "addReferenceButton";
+            this.addReferenceButton.UseVisualStyleBackColor = true;
+            this.addReferenceButton.Click += new System.EventHandler(this.addReferenceButton_Click);
             // 
             // noConfigRefsPanel
             // 
             resources.ApplyResources(this.noConfigRefsPanel, "noConfigRefsPanel");
-            this.noConfigRefsPanel.Controls.Add(this.textBox2);
+            this.noConfigRefsPanel.Controls.Add(this.label1);
             this.noConfigRefsPanel.Name = "noConfigRefsPanel";
             // 
-            // textBox2
+            // label1
             // 
-            resources.ApplyResources(this.textBox2, "textBox2");
-            this.textBox2.BackColor = System.Drawing.SystemColors.ControlLightLight;
-            this.textBox2.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.textBox2.Cursor = System.Windows.Forms.Cursors.Default;
-            this.textBox2.Name = "textBox2";
-            this.textBox2.ReadOnly = true;
-            this.textBox2.TabStop = false;
+            resources.ApplyResources(this.label1, "label1");
+            this.label1.Name = "label1";
+            // 
+            // panel3
+            // 
+            this.panel3.Controls.Add(this.configRefItemPanel);
+            resources.ApplyResources(this.panel3, "panel3");
+            this.panel3.Name = "panel3";
             // 
             // ConfigRefPanel
             // 
             resources.ApplyResources(this, "$this");
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.Controls.Add(this.configRefItemPanel);
+            this.Controls.Add(this.panel3);
             this.Controls.Add(this.noConfigRefsPanel);
             this.Controls.Add(this.panel1);
             this.Name = "ConfigRefPanel";
-            this.Load += new System.EventHandler(this.ConfigRefPanel_Load);
             this.configRefItemPanel.ResumeLayout(false);
             this.panel1.ResumeLayout(false);
-            this.panel1.PerformLayout();
+            this.panel2.ResumeLayout(false);
             this.noConfigRefsPanel.ResumeLayout(false);
-            this.noConfigRefsPanel.PerformLayout();
+            this.panel3.ResumeLayout(false);
+            this.panel3.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -131,8 +146,11 @@
         private ConfigRefPanelItem configRefPanelItem2;
         private ConfigRefPanelItem configRefPanelItem1;
         private System.Windows.Forms.Panel panel1;
-        private System.Windows.Forms.TextBox textBox1;
         private System.Windows.Forms.Panel noConfigRefsPanel;
-        private System.Windows.Forms.TextBox textBox2;
+        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Button addReferenceButton;
+        private System.Windows.Forms.Panel panel2;
+        private System.Windows.Forms.Panel panel3;
     }
 }

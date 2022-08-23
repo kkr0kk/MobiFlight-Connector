@@ -1,13 +1,10 @@
-﻿using MobiFlight.UI.Forms;
+﻿using MobiFlight.UI.Dialogs;
+using MobiFlight.UI.Forms;
 using MobiFlight.UI.Panels.Settings.Device;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml.Serialization;
@@ -25,17 +22,26 @@ namespace MobiFlight.UI.Panels.Settings
         const bool StepperSupport = true;
         const bool ServoSupport = true;
 
-        private int NumberOfModulesForFirmwareUpdate = 0;
+        
         private String FirmwareUpdatePath = "";
         public List<MobiFlightModuleInfo> modulesForFlashing = new List<MobiFlightModuleInfo>();
         public List<MobiFlightModule> modulesForUpdate = new List<MobiFlightModule>();
+        public MobiFlightModuleInfo PreselectedMobiFlightBoard { get; internal set; }
         public bool MFModuleConfigChanged { get { return _IsModified(); } }
 
         MobiFlightCache mobiflightCache;
 
+        private Dictionary<string, MobiFlight.Config.MultiplexerDriver> moduleMultiplexerDrivers = new Dictionary<string, MobiFlight.Config.MultiplexerDriver>();
+
         public MobiFlightPanel()
         {
             InitializeComponent();
+
+            IgnoreComPortsCheckBox.CheckedChanged += (s, e) =>
+            {
+                IgnoredComPortsLabel.Enabled = (s as CheckBox).Checked;
+                IgnoredComPortsTextBox.Enabled = (s as CheckBox).Checked;
+            };
         }
 
         public void Init(MobiFlightCache mobiFlightCache)
@@ -60,14 +66,12 @@ namespace MobiFlight.UI.Panels.Settings
             mfTreeViewImageList.Images.Add(DeviceType.Output.ToString(), MobiFlight.Properties.Resources.output);
             mfTreeViewImageList.Images.Add(DeviceType.LedModule.ToString(), MobiFlight.Properties.Resources.led7);
             mfTreeViewImageList.Images.Add(DeviceType.LcdDisplay.ToString(), MobiFlight.Properties.Resources.led7);
+            //mfTreeViewImageList.Images.Add(DeviceType.MultiplexerDriver.ToString(), MobiFlight.Properties.Resources.mux_driver);
             mfTreeViewImageList.Images.Add("Changed", MobiFlight.Properties.Resources.module_changed);
             mfTreeViewImageList.Images.Add("Changed-arcaze", MobiFlight.Properties.Resources.arcaze_changed);
             mfTreeViewImageList.Images.Add("new-arcaze", MobiFlight.Properties.Resources.arcaze_new);
+            mfTreeViewImageList.Images.Add("module-ignored", MobiFlight.Properties.Resources.port_deactivated);
             //mfModulesTreeView.ImageList = mfTreeViewImageList;
-
-            // setup the background worker for firmware update
-            firmwareUpdateBackgroundWorker.DoWork += new DoWorkEventHandler(firmwareUpdateBackgroundWorker_DoWork);
-            firmwareUpdateBackgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(firmwareUpdateBackgroundWorker_RunWorkerCompleted);
         }
 
         /// <summary>
@@ -86,6 +90,8 @@ namespace MobiFlight.UI.Panels.Settings
             removeDeviceToolStripButton.Enabled = false;
 
             mfModulesTreeView.Nodes.Clear();
+            moduleMultiplexerDrivers.Clear();
+
             try
             {
                 foreach (MobiFlightModuleInfo module in mobiflightCache.GetDetectedArduinoModules())
@@ -95,21 +101,24 @@ namespace MobiFlight.UI.Panels.Settings
                     if (!module.HasMfFirmware())
                     {
                         node.SelectedImageKey = node.ImageKey = "module-arduino";
+                        if (module.Type=="Ignored")
+                        {
+                            node.SelectedImageKey = node.ImageKey = "module-ignored";
+                        }
                     }
                     else
                     {
-                        Version latestVersion = new Version(MobiFlightModuleInfo.LatestFirmwareMega);
-                        switch (module.Type)
-                        {
-                            case MobiFlightModuleInfo.TYPE_ARDUINO_MICRO:
-                                latestVersion = new Version(MobiFlightModuleInfo.LatestFirmwareMicro);
-                                break;
+                        Version latestVersion = new Version(module.Board.Info.LatestFirmwareVersion);
 
-                            case MobiFlightModuleInfo.TYPE_ARDUINO_UNO:
-                                latestVersion = new Version(MobiFlightModuleInfo.LatestFirmwareUno);
-                                break;
+                        Version currentVersion;
+                        try
+                        {
+                            currentVersion = new Version(module.Version != null ? module.Version : "0.0.0");
                         }
-                        Version currentVersion = new Version(module.Version != "n/a" && module.Version != "" ? module.Version : "0.0.0");
+                        catch (Exception ex)
+                        {
+                            currentVersion = new Version("0.0.0");
+                        }
                         if (currentVersion.CompareTo(latestVersion) < 0)
                         {
                             node.SelectedImageKey = node.ImageKey = "module-update";
@@ -136,37 +145,36 @@ namespace MobiFlight.UI.Panels.Settings
                 mfModulesTreeView.Enabled = false;
             }
 
-            FwAutoUpdateCheckBox.Checked = Properties.Settings.Default.FwAutoUpdateCheck;
+            mfModulesTreeView.Select();
+            
+            FwAutoInstallCheckBox.Checked = Properties.Settings.Default.FwAutoUpdateCheck;
+            IgnoreComPortsCheckBox.Checked = Properties.Settings.Default.IgnoreComPorts;
+            IgnoredComPortsTextBox.Text = Properties.Settings.Default.IgnoredComPortsList;
 #endif
         }
 
         public void SaveSettings()
         {
             // MobiFlight Tab
-            // only the Firmware Auto Check Update needs to be synchronized 
-            Properties.Settings.Default.FwAutoUpdateCheck = FwAutoUpdateCheckBox.Checked;
+            // Firmware Auto Check Update needs to be synchronized 
+            Properties.Settings.Default.FwAutoUpdateCheck = FwAutoInstallCheckBox.Checked;
+            Properties.Settings.Default.IgnoreComPorts = IgnoreComPortsCheckBox.Checked;
+            Properties.Settings.Default.IgnoredComPortsList = IgnoredComPortsTextBox.Text;
         }
 
         private void updateFirmwareToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            TreeNode parentNode = this.mfModulesTreeView.SelectedNode;
-            if (parentNode == null) return;
-
-            if (this.mfModulesTreeView.SelectedNode == null) return;
-
-            while (parentNode.Level > 0) parentNode = parentNode.Parent;
-
-            MobiFlightModule module = parentNode.Tag as MobiFlightModule;
-            updateFirmware(module);
+            TreeNode moduleNode = getModuleNode();
+            MobiFlightModule module = moduleNode.Tag as MobiFlightModule;
+            List<MobiFlightModule> modules = new List<MobiFlightModule>();
+            modules.Add(module);
+            UpdateModules(modules);
         }
 
         private void regenerateSerialToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            TreeNode parentNode = this.mfModulesTreeView.SelectedNode;
-            if (parentNode == null) return;
-
-            while (parentNode.Level > 0) parentNode = parentNode.Parent;
-            MobiFlightModule module = parentNode.Tag as MobiFlightModule;
+            TreeNode moduleNode = getModuleNode();
+            MobiFlightModule module = moduleNode.Tag as MobiFlightModule;
             try
             {
                 module.GenerateNewSerial();
@@ -179,43 +187,48 @@ namespace MobiFlight.UI.Panels.Settings
 
             mobiflightCache.RefreshModule(module);
             MobiFlightModuleInfo newInfo = module.GetInfo() as MobiFlightModuleInfo;
-            mfModulesTreeView_initNode(newInfo, parentNode);
-            syncPanelWithSelectedDevice(parentNode);
+            mfModulesTreeView_initNode(newInfo, moduleNode);
+            syncPanelWithSelectedDevice(moduleNode);
         }
 
         private void reloadConfigToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            TreeNode parentNode = this.mfModulesTreeView.SelectedNode;
-            if (parentNode == null) return;
-
-            while (parentNode.Level > 0) parentNode = parentNode.Parent;
-            MobiFlightModule module = parentNode.Tag as MobiFlightModule;
+            TreeNode moduleNode = getModuleNode();
+            MobiFlightModule module = moduleNode.Tag as MobiFlightModule;
             module.Config = null;
             module.LoadConfig();
-            mfModulesTreeView_initNode(module.GetInfo() as MobiFlightModuleInfo, parentNode);
+            mfModulesTreeView_initNode(module.GetInfo() as MobiFlightModuleInfo, moduleNode);
+        }
+
+        private void mfModulesTreeView_AfterExpand(object sender, TreeViewEventArgs e)
+        {
+            if (e.Node == null) return;
+            mfModulesTreeView.SelectedNode = e.Node;
+        }
+
+        private void mfModulesTreeView_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
+        {
+            if (e.Node == null) return;
+            mfModulesTreeView.SelectedNode = e.Node;
         }
 
         private void mfModulesTreeView_AfterSelect(object sender, TreeViewEventArgs e)
         {
             if (e.Node == null) return;
-            TreeNode parentNode = e.Node;
-            while (parentNode.Level > 0) parentNode = parentNode.Parent;
+            TreeNode moduleNode = getModuleNode(e.Node);
 
             mfSettingsPanel.Controls.Clear();
-            if (parentNode.Tag == null) return;
+            if (moduleNode.Tag == null) return;
 
-            bool isMobiFlightBoard = (parentNode.Tag as MobiFlightModule).Type != MobiFlightModuleInfo.TYPE_ARDUINO_MEGA
-                                  && (parentNode.Tag as MobiFlightModule).Type != MobiFlightModuleInfo.TYPE_ARDUINO_MICRO
-                                  && (parentNode.Tag as MobiFlightModule).Type != MobiFlightModuleInfo.TYPE_ARDUINO_UNO;
+            bool isMobiFlightBoard = (moduleNode.Tag as MobiFlightModule).HasMfFirmware();
 
             mobiflightSettingsToolStrip.Enabled = isMobiFlightBoard;
             // this is the module node
             // set the add device icon enabled
             addDeviceToolStripDropDownButton.Enabled = isMobiFlightBoard;
             removeDeviceToolStripButton.Enabled = isMobiFlightBoard & (e.Node.Level > 0);
-            uploadToolStripButton.Enabled = (parentNode.Nodes.Count > 0) || (parentNode.ImageKey == "Changed");
-            saveToolStripButton.Enabled = parentNode.Nodes.Count > 0;
-
+            uploadToolStripButton.Enabled = (moduleNode.Nodes.Count > 0) || (moduleNode.ImageKey == "Changed");
+            saveToolStripButton.Enabled = moduleNode.Nodes.Count > 0;
 
             // Toggle visibility of items in context menu
             // depending on whether it is a MobiFlight Board or not
@@ -223,41 +236,60 @@ namespace MobiFlight.UI.Panels.Settings
             // this is by default true
             addToolStripMenuItem.Enabled = isMobiFlightBoard;
             removeToolStripMenuItem.Enabled = isMobiFlightBoard & (e.Node.Level > 0);
-            uploadToolStripMenuItem.Enabled = (parentNode.Nodes.Count > 0) || (parentNode.ImageKey == "Changed");
+            uploadToolStripMenuItem.Enabled = (moduleNode.Nodes.Count > 0) || (moduleNode.ImageKey == "Changed");
             openToolStripMenuItem.Enabled = isMobiFlightBoard;
-            saveToolStripMenuItem.Enabled = parentNode.Nodes.Count > 0;
-            saveAsToolStripMenuItem.Enabled = parentNode.Nodes.Count > 0;
+            saveToolStripMenuItem.Enabled = moduleNode.Nodes.Count > 0;
+            regenerateSerialToolStripMenuItem.Enabled = isMobiFlightBoard;
+            reloadConfigToolStripMenuItem.Enabled = isMobiFlightBoard;
+
+            // the COM port actions depend on whether
+            // the module is already ignored or not
+            ignoreCOMPortToolStripMenuItem.Visible = moduleNode.ImageKey != "module-ignored";
+            dontIgnoreCOMPortToolStripMenuItem.Visible = moduleNode.ImageKey == "module-ignored";
+
+            // if the module is ignored, we don't want
+            // to display the firmware upload options, etc.
+            updateFirmwareToolStripMenuItem.Enabled = moduleNode.ImageKey != "module-ignored";
 
             syncPanelWithSelectedDevice(e.Node);
         }
 
-        private TreeNode mfModulesTreeView_initNode(MobiFlightModuleInfo module, TreeNode node)
+        private TreeNode mfModulesTreeView_initNode(MobiFlightModuleInfo module, TreeNode moduleNode)
         {
-            node.Text = module.Name;
+            moduleNode.Text = module.Name;
             if (module.HasMfFirmware())
             {
-                node.SelectedImageKey = node.ImageKey = "module";
-                node.Tag = mobiflightCache.GetModule(module);
-                node.Nodes.Clear();
+                moduleNode.SelectedImageKey = moduleNode.ImageKey = "module";
+                moduleNode.Tag = mobiflightCache.GetModule(module);
+                moduleNode.Nodes.Clear();
+                moduleMultiplexerDrivers.Remove(module.Name);
 
-                if (null == (node.Tag as MobiFlightModule).Config) return node;
+                if (null == (moduleNode.Tag as MobiFlightModule).Config) return moduleNode;
 
-                foreach (MobiFlight.Config.BaseDevice device in (node.Tag as MobiFlightModule).Config.Items)
+                // This is where the UI (TreeView.Node.Tag) is populated with the configuration data coming from MobiFlightModule.Config.Items
+                
+                foreach (MobiFlight.Config.BaseDevice device in (moduleNode.Tag as MobiFlightModule).Config.Items)
                 {
                     if (device == null) continue; // Happens if working on an older firmware version. Ok.
 
-                    TreeNode deviceNode = new TreeNode(device.Name);
-                    deviceNode.Tag = device;
-                    deviceNode.SelectedImageKey = deviceNode.ImageKey = device.Type.ToString();
-                    node.Nodes.Add(deviceNode);
+                    // MultiplexerDrivers should not appear in the tree, therefore they are stored in a dictionary 
+                    // (by module name) for easy retrieval
+                    if(device.Type == DeviceType.MultiplexerDriver) {
+                        moduleMultiplexerDrivers.Add(module.Name, device as MobiFlight.Config.MultiplexerDriver);
+                    } else {
+                        TreeNode deviceNode = new TreeNode(device.Name);
+                        deviceNode.Tag = device;
+                        deviceNode.SelectedImageKey = deviceNode.ImageKey = device.Type.ToString();
+                        moduleNode.Nodes.Add(deviceNode);
+                    }
                 }
             }
             else
             {
-                node.Tag = new MobiFlightModule(new MobiFlightModuleConfig() { ComPort = module.Port, Type = module.Type });
+                moduleNode.Tag = new MobiFlightModule(module.Port, module.Board);
             }
 
-            return node;
+            return moduleNode;
         }
 
         /// <summary>
@@ -266,6 +298,7 @@ namespace MobiFlight.UI.Panels.Settings
         /// <param name="selectedNode"></param>
         private void syncPanelWithSelectedDevice(TreeNode selectedNode)
         {
+            if (selectedNode == null) return;
             try
             {
                 Control panel = null;
@@ -276,14 +309,13 @@ namespace MobiFlight.UI.Panels.Settings
 
                 if (selectedNode.Level == 0)
                 {
+                    // It's a Module entry
                     panel = new MFModulePanel((selectedNode.Tag as MobiFlightModule));
                     (panel as MFModulePanel).Changed += new EventHandler(mfConfigDeviceObject_changed);
                 }
                 else
                 {
-                    TreeNode parentNode = mfModulesTreeView.SelectedNode;
-                    if (parentNode == null) return;
-                    while (parentNode.Level > 0) parentNode = parentNode.Parent;
+                    // It's a Device entry
                     MobiFlightModule module = getVirtualModuleFromTree();
 
                     MobiFlight.Config.BaseDevice dev = (selectedNode.Tag as MobiFlight.Config.BaseDevice);
@@ -320,7 +352,7 @@ namespace MobiFlight.UI.Panels.Settings
                             break;
 
                         case DeviceType.Output:
-                            panel = new MFOutputPanel(dev as MobiFlight.Config.Output, module.GetPins(), module.Type);
+                            panel = new MFOutputPanel(dev as MobiFlight.Config.Output, module.GetPins(), module.Board);
                             (panel as MFOutputPanel).Changed += new EventHandler(mfConfigDeviceObject_changed);
                             break;
 
@@ -333,7 +365,24 @@ namespace MobiFlight.UI.Panels.Settings
                             panel = new MFShiftRegisterPanel(dev as MobiFlight.Config.ShiftRegister, module.GetPins());
                             (panel as MFShiftRegisterPanel).Changed += new EventHandler(mfConfigDeviceObject_changed);
                             break;
-                            // output
+
+                        case DeviceType.InputShiftRegister:
+                            panel = new MFInputShiftRegisterPanel(dev as MobiFlight.Config.InputShiftRegister, module.GetPins());
+                            (panel as MFInputShiftRegisterPanel).Changed += new EventHandler(mfConfigDeviceObject_changed);
+                            break;
+
+                        case DeviceType.InputMultiplexer:
+                            panel = new MFInputMultiplexerPanel(dev as MobiFlight.Config.InputMultiplexer, module.GetPins(), (getFirstMuxClient()==selectedNode));
+                            (panel as MFInputMultiplexerPanel).Changed += new EventHandler(mfConfigDeviceObject_changed);
+                            (panel as MFInputMultiplexerPanel).MoveToFirstMux += new EventHandler(mfMoveToFirstMuxClient);
+                            break;
+
+                        //case DeviceType.MultiplexerDriver:
+                        //    panel = new MFMultiplexerDriverPanel (dev as MobiFlight.Config.MultiplexerDriver, module.GetPins());
+                        //    (panel as MFMultiplexerDriverPanel).Changed += new EventHandler(mfConfigDeviceObject_changed);
+                        //    break;
+
+                        // output
                     }
                 }
 
@@ -352,6 +401,47 @@ namespace MobiFlight.UI.Panels.Settings
         }
 
         /// <summary>
+        /// Helper function to add a node in the current module structure
+        /// </summary>
+        ///<returns>Newly created TreeNode if correctly added, null otherwise</returns>
+        /// <param name="device">Device to add as node</param>
+        /// <param name="pos">Position in the list (null = last)</param>
+        /// 
+        private TreeNode addDeviceToModule(MobiFlight.Config.BaseDevice device, int pos = -1)
+        {
+            bool added = false;
+
+            TreeNode ModuleNode = getModuleNode();
+            if (ModuleNode == null) return null;
+
+            // Build a list of all names in the tree
+            List<String> NodeNames = new List<String>();
+            foreach (TreeNode node in ModuleNode.Nodes) {
+                NodeNames.Add(node.Text);
+            }
+            // Use the list of names for verification to build a new unique name
+            device.Name = MobiFlightModule.GenerateUniqueDeviceName(NodeNames.ToArray(), device.Name);
+
+            // Build new node containing the device
+            TreeNode newNode = new TreeNode(device.Name);
+            newNode.SelectedImageKey = newNode.ImageKey = device.Type.ToString();
+            newNode.Tag = device;
+
+            // Add newly built node to the tree
+            if (pos < 0 || pos > ModuleNode.Nodes.Count) {
+                ModuleNode.Nodes.Add(newNode);
+            } else {
+                ModuleNode.Nodes.Insert(pos, newNode);
+            }
+            ModuleNode.ImageKey = "Changed";
+            ModuleNode.SelectedImageKey = "Changed";
+
+            // Make it the current selected one
+            mfModulesTreeView.SelectedNode = newNode;
+            return newNode;
+        }
+
+        /// <summary>
         /// EventHandler to add a selected device to the current module
         /// </summary>
         /// <param name="sender"></param>
@@ -364,92 +454,115 @@ namespace MobiFlight.UI.Panels.Settings
             {
                 cfgItem = null;
                 tempModule = getVirtualModuleFromTree();
+                if (tempModule == null) return;
                 tempModule.LoadConfig();
                 Dictionary<String, int> statistics = tempModule.GetConnectedDevicesStatistics();
+                List<MobiFlightPin> freePinList = getVirtualModuleFromTree().GetFreePins();
 
                 switch ((sender as ToolStripMenuItem).Name)
                 {
                     case "servoToolStripMenuItem":
                     case "addServoToolStripMenuItem":
-                        if (statistics[MobiFlightServo.TYPE] == tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxServos)
+                        if (statistics[MobiFlightServo.TYPE] == tempModule.Board.ModuleLimits.MaxServos)
                         {
-                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightServo.TYPE, tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxServos);
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightServo.TYPE, tempModule.Board.ModuleLimits.MaxServos);
                         }
 
                         cfgItem = new MobiFlight.Config.Servo();
-                        (cfgItem as MobiFlight.Config.Servo).DataPin = getVirtualModuleFromTree().GetFreePins().ElementAt(0).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.Servo).DataPin = freePinList.ElementAt(0).Pin.ToString();
                         break;
                     case "stepperToolStripMenuItem":
                     case "addStepperToolStripMenuItem":
-                        if (statistics[MobiFlightStepper.TYPE] == tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxSteppers)
+                        if (statistics[MobiFlightStepper.TYPE] == tempModule.Board.ModuleLimits.MaxSteppers)
                         {
-                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightStepper.TYPE, tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxSteppers);
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightStepper.TYPE, tempModule.Board.ModuleLimits.MaxSteppers);
                         }
 
                         cfgItem = new MobiFlight.Config.Stepper();
-                        (cfgItem as MobiFlight.Config.Stepper).Pin1 = getVirtualModuleFromTree().GetFreePins().ElementAt(0).Pin.ToString();
-                        (cfgItem as MobiFlight.Config.Stepper).Pin2 = getVirtualModuleFromTree().GetFreePins().ElementAt(1).Pin.ToString();
-                        (cfgItem as MobiFlight.Config.Stepper).Pin3 = getVirtualModuleFromTree().GetFreePins().ElementAt(2).Pin.ToString();
-                        (cfgItem as MobiFlight.Config.Stepper).Pin4 = getVirtualModuleFromTree().GetFreePins().ElementAt(3).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.Stepper).Pin1 = freePinList.ElementAt(0).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.Stepper).Pin2 = freePinList.ElementAt(1).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.Stepper).Pin3 = freePinList.ElementAt(2).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.Stepper).Pin4 = freePinList.ElementAt(3).Pin.ToString();
                         //(cfgItem as MobiFlight.Config.Stepper).BtnPin = getModuleFromTree().GetFreePins().ElementAt(4).ToString();
                         break;
                     case "ledOutputToolStripMenuItem":
                     case "addOutputToolStripMenuItem":
-                        if (statistics[MobiFlightOutput.TYPE] == tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxOutputs)
+                        if (statistics[MobiFlightOutput.TYPE] == tempModule.Board.ModuleLimits.MaxOutputs)
                         {
-                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightOutput.TYPE, tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxOutputs);
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightOutput.TYPE, tempModule.Board.ModuleLimits.MaxOutputs);
                         }
 
                         cfgItem = new MobiFlight.Config.Output();
-                        (cfgItem as MobiFlight.Config.Output).Pin = getVirtualModuleFromTree().GetFreePins().ElementAt(0).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.Output).Pin = freePinList.ElementAt(0).Pin.ToString();
                         break;
                     case "ledSegmentToolStripMenuItem":
                     case "addLedModuleToolStripMenuItem":
-                        if (statistics[MobiFlightLedModule.TYPE] == tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxLedSegments)
+                        if (statistics[MobiFlightLedModule.TYPE] == tempModule.Board.ModuleLimits.MaxLedSegments)
                         {
-                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightLedModule.TYPE, tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxLedSegments);
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightLedModule.TYPE, tempModule.Board.ModuleLimits.MaxLedSegments);
                         }
 
                         cfgItem = new MobiFlight.Config.LedModule();
-                        (cfgItem as MobiFlight.Config.LedModule).DinPin = getVirtualModuleFromTree().GetFreePins().ElementAt(0).Pin.ToString();
-                        (cfgItem as MobiFlight.Config.LedModule).ClkPin = getVirtualModuleFromTree().GetFreePins().ElementAt(1).Pin.ToString();
-                        (cfgItem as MobiFlight.Config.LedModule).ClsPin = getVirtualModuleFromTree().GetFreePins().ElementAt(2).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.LedModule).DinPin = freePinList.ElementAt(0).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.LedModule).ClkPin = freePinList.ElementAt(1).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.LedModule).ClsPin = freePinList.ElementAt(2).Pin.ToString();
                         break;
                     case "analogDeviceToolStripMenuItem1":
                     case "analogDeviceToolStripMenuItem":
-                        if (statistics[MobiFlightAnalogInput.TYPE] == tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxAnalogInputs)
+                        if (statistics[MobiFlightAnalogInput.TYPE] == tempModule.Board.ModuleLimits.MaxAnalogInputs)
                         {
-                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightAnalogInput.TYPE, tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxAnalogInputs);
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightAnalogInput.TYPE, tempModule.Board.ModuleLimits.MaxAnalogInputs);
                         }
                         cfgItem = new MobiFlight.Config.AnalogInput();
-                        (cfgItem as MobiFlight.Config.AnalogInput).Pin = getVirtualModuleFromTree().GetFreePins().FindAll(x=>x.isAnalog==true).ElementAt(0).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.AnalogInput).Pin = freePinList.FindAll(x=>x.isAnalog==true).ElementAt(0).Pin.ToString();
                         break;                        
                     case "buttonToolStripMenuItem":
                     case "addButtonToolStripMenuItem":
-                        if (statistics[MobiFlightButton.TYPE] == tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxButtons)
+                        if (statistics[MobiFlightButton.TYPE] == tempModule.Board.ModuleLimits.MaxButtons)
                         {
-                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightButton.TYPE, tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxButtons);
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightButton.TYPE, tempModule.Board.ModuleLimits.MaxButtons);
                         }
 
                         cfgItem = new MobiFlight.Config.Button();
-                        (cfgItem as MobiFlight.Config.Button).Pin = getVirtualModuleFromTree().GetFreePins().ElementAt(0).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.Button).Pin = freePinList.ElementAt(0).Pin.ToString();
                         break;
                     case "encoderToolStripMenuItem":
                     case "addEncoderToolStripMenuItem":
-                        if (statistics[MobiFlightEncoder.TYPE] == tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxEncoders)
+                        if (statistics[MobiFlightEncoder.TYPE] == tempModule.Board.ModuleLimits.MaxEncoders)
                         {
-                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightEncoder.TYPE, tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxEncoders);
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightEncoder.TYPE, tempModule.Board.ModuleLimits.MaxEncoders);
                         }
 
                         cfgItem = new MobiFlight.Config.Encoder();
-                        (cfgItem as MobiFlight.Config.Encoder).PinLeft = getVirtualModuleFromTree().GetFreePins().ElementAt(0).Pin.ToString();
-                        (cfgItem as MobiFlight.Config.Encoder).PinRight = getVirtualModuleFromTree().GetFreePins().ElementAt(1).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.Encoder).PinLeft = freePinList.ElementAt(0).Pin.ToString();
+                        (cfgItem as MobiFlight.Config.Encoder).PinRight = freePinList.ElementAt(1).Pin.ToString();
                         break;
+                    case "inputShiftRegisterToolStripMenuItem":
+                    case "addInputShiftRegisterToolStripMenuItem":
+                        if (statistics[MobiFlightInputShiftRegister.TYPE] == tempModule.Board.ModuleLimits.MaxInputShifters)
+                        {
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightInputShiftRegister.TYPE, tempModule.Board.ModuleLimits.MaxInputShifters);
+                        }
+                        cfgItem = new MobiFlight.Config.InputShiftRegister();
+                        (cfgItem as MobiFlight.Config.InputShiftRegister).DataPin = freePinList.ElementAt(0).ToString();
+                        (cfgItem as MobiFlight.Config.InputShiftRegister).ClockPin = freePinList.ElementAt(1).ToString();
+                        (cfgItem as MobiFlight.Config.InputShiftRegister).LatchPin = freePinList.ElementAt(2).ToString();
+                        break;
+                    case "inputMultiplexerToolStripMenuItem":
+                    case "addInputMultiplexerToolStripMenuItem":
+                        if (statistics[MobiFlightInputMultiplexer.TYPE] == tempModule.Board.ModuleLimits.MaxInputMultiplexer) {
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightInputMultiplexer.TYPE, tempModule.Board.ModuleLimits.MaxInputMultiplexer);
+                        }
+                        // getOrAddModuleMultiplexerDriver() takes care of creating the MultiplexerDriver if not done yet:
+                        cfgItem = new MobiFlight.Config.InputMultiplexer(getOrAddModuleMultiplexerDriver(freePinList));
+                        (cfgItem as MobiFlight.Config.InputMultiplexer).DataPin = freePinList.ElementAt(0).ToString();
+                        break;
+
                     case "LcdDisplayToolStripMenuItem":
                     case "addLcdDisplayToolStripMenuItem":
-                        if (statistics[MobiFlightLcdDisplay.TYPE] == tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxLcdI2C)
+                        if (statistics[MobiFlightLcdDisplay.TYPE] == tempModule.Board.ModuleLimits.MaxLcdI2C)
                         {
-                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightLcdDisplay.TYPE, tempModule.ToMobiFlightModuleInfo().GetCapabilities().MaxLcdI2C);
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightLcdDisplay.TYPE, tempModule.Board.ModuleLimits.MaxLcdI2C);
                         }
 
                         cfgItem = new MobiFlight.Config.LcdDisplay();
@@ -458,41 +571,30 @@ namespace MobiFlight.UI.Panels.Settings
 
                     case "ShiftRegisterToolStripMenuItem":
                     case "addShiftRegisterToolStripMenuItem":
+                        if (statistics[MobiFlightShiftRegister.TYPE] == tempModule.Board.ModuleLimits.MaxShifters)
+                        {
+                            throw new MaximumDeviceNumberReachedMobiFlightException(MobiFlightShiftRegister.TYPE, tempModule.Board.ModuleLimits.MaxShifters);
+                        }
                         cfgItem = new MobiFlight.Config.ShiftRegister();
-                        (cfgItem as MobiFlight.Config.ShiftRegister).DataPin = getVirtualModuleFromTree().GetFreePins().ElementAt(0).ToString();
-                        (cfgItem as MobiFlight.Config.ShiftRegister).ClockPin = getVirtualModuleFromTree().GetFreePins().ElementAt(1).ToString();
-                        (cfgItem as MobiFlight.Config.ShiftRegister).LatchPin = getVirtualModuleFromTree().GetFreePins().ElementAt(2).ToString();                        
+                        (cfgItem as MobiFlight.Config.ShiftRegister).DataPin = freePinList.ElementAt(0).ToString();
+                        (cfgItem as MobiFlight.Config.ShiftRegister).ClockPin = freePinList.ElementAt(1).ToString();
+                        (cfgItem as MobiFlight.Config.ShiftRegister).LatchPin = freePinList.ElementAt(2).ToString();                        
                         break;
 
                     default:
                         // do nothing
                         return;
                 }
-                TreeNode parentNode = mfModulesTreeView.SelectedNode;
-                if (parentNode == null) return;
 
-                while (parentNode.Level > 0) parentNode = parentNode.Parent;
-                List<String> NodeNames = new List<String>();
-                foreach (TreeNode node in parentNode.Nodes)
-                {
-                    NodeNames.Add(node.Text);
-                }
-                cfgItem.Name = MobiFlightModule.GenerateUniqueDeviceName(NodeNames.ToArray(), cfgItem.Name);
-
-                TreeNode newNode = new TreeNode(cfgItem.Name);
-                newNode.SelectedImageKey = newNode.ImageKey = cfgItem.Type.ToString();
-                newNode.Tag = cfgItem;
-
-                parentNode.Nodes.Add(newNode);
-                parentNode.ImageKey = "Changed";
-                parentNode.SelectedImageKey = "Changed";
-
-                mfModulesTreeView.SelectedNode = newNode;
+                // Add a tree element corresponding to the just created config item 
+                TreeNode newNode = addDeviceToModule(cfgItem);
+                
+                // Update the side panel
                 syncPanelWithSelectedDevice(newNode);
             }
             catch (MaximumDeviceNumberReachedMobiFlightException ex)
             {
-                MessageBox.Show(String.Format(i18n._tr("uiMessageMaxNumberOfDevicesReached"), ex.MaxNumber, ex.DeviceType, tempModule.Type),
+                MessageBox.Show(String.Format(i18n._tr("uiMessageMaxNumberOfDevicesReached"), ex.MaxNumber, ex.DeviceType, tempModule.Board.Info.MobiFlightType),
                                 i18n._tr("uiMessageNotEnoughPinsHint"),
                                 MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -502,20 +604,30 @@ namespace MobiFlight.UI.Panels.Settings
                                 i18n._tr("uiMessageNotEnoughPinsHint"),
                                 MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-
+        }
+        
+        /// <summary>
+        /// Move selection to the first device in the TreeView that is a
+        /// Multiplexer client (if any)
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        void mfMoveToFirstMuxClient(object sender, EventArgs e)
+        {
+            TreeNode firstMuxNode = getFirstMuxClient();
+            if (firstMuxNode == null) return;
+            mfModulesTreeView.SelectedNode = firstMuxNode;
+            syncPanelWithSelectedDevice(firstMuxNode);
         }
 
         /// <summary>
-        /// Update the name of a module in the TreeView
+        /// Update the name of a module or device in the TreeView
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
         void mfConfigDeviceObject_changed(object sender, EventArgs e)
         {
-            TreeNode parentNode = mfModulesTreeView.SelectedNode;
-            if (parentNode == null) return;
-
-            while (parentNode.Level > 0) parentNode = parentNode.Parent;
+            TreeNode moduleNode = getModuleNode();
 
             String UniqueName;
             bool BaseDeviceHasChanged = (sender is MobiFlight.Config.BaseDevice);
@@ -554,7 +666,7 @@ namespace MobiFlight.UI.Panels.Settings
             if (BaseDeviceHasChanged)
             {
                 List<String> NodeNames = new List<String>();
-                foreach (TreeNode node in parentNode.Nodes)
+                foreach (TreeNode node in moduleNode.Nodes)
                 {
                     if (node == mfModulesTreeView.SelectedNode) continue;
                     NodeNames.Add(node.Text);
@@ -575,32 +687,34 @@ namespace MobiFlight.UI.Panels.Settings
                 mfModulesTreeView.SelectedNode.Text = (sender as MobiFlight.MobiFlightModule).Name;
             }
 
-            parentNode.ImageKey = "Changed";
-            parentNode.SelectedImageKey = "Changed";
+            moduleNode.ImageKey = "Changed";
+            moduleNode.SelectedImageKey = "Changed";
 
+            // This could be used to account for changes also to different module parameters
+            // Currently, the handler is empty!
             OnModuleConfigChanged?.Invoke(sender, null);
         }
 
-
         private void saveToolStripButton_Click(object sender, EventArgs e)
         {
-            TreeNode parentNode = mfModulesTreeView.SelectedNode;
-            if (parentNode == null) return;
+            TreeNode moduleNode = getModuleNode();
+            MobiFlightModule module = moduleNode.Tag as MobiFlightModule;
 
-            while (parentNode.Level > 0) parentNode = parentNode.Parent;
-
-            MobiFlightModule module = parentNode.Tag as MobiFlightModule;
             MobiFlight.Config.Config newConfig = new MobiFlight.Config.Config();
             newConfig.ModuleName = module.Name;
 
-            foreach (TreeNode node in parentNode.Nodes)
+            foreach (MobiFlight.Config.MultiplexerDriver multiplexerDriver in moduleMultiplexerDrivers.Values) {
+                newConfig.Items.Add(multiplexerDriver as MobiFlight.Config.BaseDevice);
+            }
+
+            foreach (TreeNode node in moduleNode.Nodes)
             {
                 newConfig.Items.Add(node.Tag as MobiFlight.Config.BaseDevice);
             }
 
             SaveFileDialog fd = new SaveFileDialog();
             fd.Filter = "Mobiflight Module Config (*.mfmc)|*.mfmc";
-            fd.FileName = parentNode.Text + ".mfmc";
+            fd.FileName = moduleNode.Text + ".mfmc";
 
             if (DialogResult.OK == fd.ShowDialog())
             {
@@ -613,10 +727,8 @@ namespace MobiFlight.UI.Panels.Settings
 
         private void openToolStripButton_Click(object sender, EventArgs e)
         {
-            TreeNode parentNode = mfModulesTreeView.SelectedNode;
-            if (parentNode == null) return;
-
-            while (parentNode.Level > 0) parentNode = parentNode.Parent;
+            TreeNode moduleNode = getModuleNode();
+            MobiFlightModule module = moduleNode.Tag as MobiFlightModule;
 
             OpenFileDialog fd = new OpenFileDialog();
             fd.Filter = "Mobiflight Module Config (*.mfmc)|*.mfmc";
@@ -631,22 +743,24 @@ namespace MobiFlight.UI.Panels.Settings
 
                 if (newConfig.ModuleName != null && newConfig.ModuleName != "")
                 {
-                    parentNode.Text = (parentNode.Tag as MobiFlightModule).Name = newConfig.ModuleName;
+                    moduleNode.Text = (moduleNode.Tag as MobiFlightModule).Name = newConfig.ModuleName;
 
                 }
 
-                parentNode.Nodes.Clear();
+                moduleNode.Nodes.Clear();
 
                 foreach (MobiFlight.Config.BaseDevice device in newConfig.Items)
                 {
-                    TreeNode newNode = new TreeNode(device.Name);
-                    newNode.Tag = device;
-                    newNode.SelectedImageKey = newNode.ImageKey = device.Type.ToString();
-                    parentNode.Nodes.Add(newNode);
+                    if(device.Type != DeviceType.MultiplexerDriver) {
+                        TreeNode newNode = new TreeNode(device.Name);
+                        newNode.Tag = device;
+                        newNode.SelectedImageKey = newNode.ImageKey = device.Type.ToString();
+                        moduleNode.Nodes.Add(newNode);
+                    }
                 }
 
-                parentNode.ImageKey = "Changed";
-                parentNode.SelectedImageKey = "Changed";
+                moduleNode.ImageKey = "Changed";
+                moduleNode.SelectedImageKey = "Changed";
             }
         }
 
@@ -654,15 +768,20 @@ namespace MobiFlight.UI.Panels.Settings
         {
             TreeNode node = mfModulesTreeView.SelectedNode;
             if (node == null) return;
-            if (node.Level == 0) return;
+            if (node.Level == 0) return;    // removing a device, not a module
 
-            TreeNode parentNode = mfModulesTreeView.SelectedNode;
-            while (parentNode.Level > 0) parentNode = parentNode.Parent;
+            TreeNode ModuleNode = getModuleNode();
 
             mfModulesTreeView.Nodes.Remove(node);
+            
+            // if we're removing a device that uses the multiplexer driver (currently InputMultiplexer only),
+            // check if any other device uses it, and otherwise make sure to remove that too 
+            if (requiresMultiplexerDriver(node.Tag as MobiFlight.Config.BaseDevice)) {
+                unregisterMuxClient();
+            }
 
-            parentNode.ImageKey = "Changed";
-            parentNode.SelectedImageKey = "Changed";
+            ModuleNode.ImageKey = "Changed";
+            ModuleNode.SelectedImageKey = "Changed";
         }
 
         /// <summary>
@@ -679,15 +798,11 @@ namespace MobiFlight.UI.Panels.Settings
                 return;
             }
 
-            TreeNode parentNode = mfModulesTreeView.SelectedNode;
-            if (parentNode == null) return;
-
-            while (parentNode.Level > 0) parentNode = parentNode.Parent;
-
-            MobiFlightModule module = parentNode.Tag as MobiFlightModule;
+            TreeNode moduleNode = getModuleNode();
+            MobiFlightModule module = moduleNode.Tag as MobiFlightModule;
             MobiFlight.Config.Config newConfig = new MobiFlight.Config.Config();
 
-            foreach (TreeNode node in parentNode.Nodes)
+            foreach (TreeNode node in moduleNode.Nodes)
             {
                 newConfig.Items.Add(node.Tag as MobiFlight.Config.BaseDevice);
             }
@@ -695,8 +810,8 @@ namespace MobiFlight.UI.Panels.Settings
             module.Config = newConfig;
 
             // Prevent upload from too long configs that would exceed the available EEPROM size
-            String LogMessage = String.Join("", module.Config.ToInternal(module.MaxMessageSize).ToArray());
-            if (LogMessage.Length > module.EepromSize)
+            String LogMessage = String.Join("", module.Config.ToInternal(module.Board.Connection.MessageSize).ToArray());
+            if (LogMessage.Length > module.Board.Connection.EEPROMSize)
             {
                 MessageBox.Show(i18n._tr("uiMessageUploadConfigurationTooLong"),
                                 i18n._tr("uiMessageUploadConfigurationHint"),
@@ -737,9 +852,13 @@ namespace MobiFlight.UI.Panels.Settings
 
             if (uploadResult)
             {
-                MessageBox.Show(i18n._tr("uiMessageUploadConfigurationFinished"),
-                                i18n._tr("uiMessageUploadConfigurationHint"),
-                                MessageBoxButtons.OK);
+                TimeoutMessageDialog tmd = new TimeoutMessageDialog();
+                tmd.StartPosition = FormStartPosition.CenterParent;
+                tmd.DefaultDialogResult = DialogResult.Cancel;
+                tmd.Message = i18n._tr("uiMessageUploadConfigurationFinished");
+                tmd.Text = i18n._tr("uiMessageUploadConfigurationHint");
+                tmd.HasCancelButton = false;
+                tmd.ShowDialog();
             }
             else
             {
@@ -747,8 +866,8 @@ namespace MobiFlight.UI.Panels.Settings
                                 i18n._tr("uiMessageUploadConfigurationHint"),
                                 MessageBoxButtons.OK);
             }
-            parentNode.ImageKey = "";
-            parentNode.SelectedImageKey = "";
+            moduleNode.ImageKey = "";
+            moduleNode.SelectedImageKey = "";
         }
 
         protected bool _IsModified()
@@ -760,39 +879,119 @@ namespace MobiFlight.UI.Panels.Settings
             return false;
         }
 
-        private TreeNode getModuleNode(TreeNode node)
+        private TreeNode getModuleNode(TreeNode node = null)
         {
-            TreeNode moduleNode = node;
+            TreeNode moduleNode = (node != null ? node : this.mfModulesTreeView.SelectedNode);
+            if (moduleNode == null) return null;
             while (moduleNode.Level > 0) moduleNode = moduleNode.Parent;
             return moduleNode;
         }
 
+        private TreeNode getFirstMuxClient()
+        {
+            TreeNode moduleNode = getModuleNode();
+            foreach (TreeNode node in moduleNode.Nodes) {
+                // BaseDevice is (node.Tag as MobiFlight.Config.BaseDevice);
+                if ((node.Tag as MobiFlight.Config.BaseDevice).isMuxClient) return node;
+            }
+            return null;
+        }
+
+        // Generate a new complete module object from the information in the panel tree
         private MobiFlightModule getVirtualModuleFromTree()
         {
-            TreeNode parentNode = mfModulesTreeView.SelectedNode;
-            if (parentNode == null) return null;
+            TreeNode moduleNode = getModuleNode();
+            if (moduleNode == null) return null;
 
-            parentNode = getModuleNode(parentNode);
-
-            MobiFlightModule module = new MobiFlightModule(
-                new MobiFlightModuleConfig()
-                {
-                    ComPort = (parentNode.Tag as MobiFlightModule).Port,
-                    Type = (parentNode.Tag as MobiFlightModule).Type
-                }
-            );
+            MobiFlightModule module = new MobiFlightModule((moduleNode.Tag as MobiFlightModule).Port, (moduleNode.Tag as MobiFlightModule).Board);
             
+            // Generate config
             MobiFlight.Config.Config newConfig = new MobiFlight.Config.Config();
-            foreach (TreeNode node in parentNode.Nodes)
+            foreach (TreeNode node in moduleNode.Nodes)
             {
                 newConfig.Items.Add(node.Tag as MobiFlight.Config.BaseDevice);
             }
-
             module.Config = newConfig;
-
-
             return module;
         }
+
+        /// <summary>
+        /// Tell whether a device requires the presence of a MultiplexerDriver 
+        /// </summary>
+        /// <returns>true if required, false otherwise</returns>
+        /// This function could be turned to a method of MobiFlight.Config.BaseDevice
+        private bool requiresMultiplexerDriver(MobiFlight.Config.BaseDevice device)
+        {
+            // Currently, the only device type requiring a mux driver is the Digital Input Mux;
+            // in a prospective improvement, multiplexers can easily be used to route many other devices.
+            // These devices may basically be the exact same ones that are in use now directly attached,
+            // provided that a "channel" attribute is added. A device assigned to channel #N will be polled
+            // by the firmware (and correctly routed) by setting the mux driver channel to N.
+            // When/if this will be implemented, each "mux-able" object shall have to be set isMuxClient=true
+            // if it has a non-null "channel" value.
+            return device.isMuxClient;
+        }
+
+        private MobiFlight.Config.MultiplexerDriver getModuleMultiplexerDriver()
+        {
+            MobiFlight.Config.MultiplexerDriver moduleMultiplexerDriver;
+            
+            string moduleName = getModuleNode().Name;
+
+            if (!moduleMultiplexerDrivers.ContainsKey(moduleName)) {
+                // None found: we are adding first client, therefore we must also build a new MultiplexerDriver
+                moduleMultiplexerDriver = new MobiFlight.Config.MultiplexerDriver();
+                // append it to module's configuration first,
+                TreeNode moduleNode = getModuleNode();
+                (moduleNode.Tag as MobiFlightModule).Config.Items.Add(moduleMultiplexerDriver);
+                // then also add it to the GUI list
+                moduleMultiplexerDrivers.Add(moduleName, moduleMultiplexerDriver);
+            } else {
+                moduleMultiplexerDriver = moduleMultiplexerDrivers[moduleName];
+            }
+            return moduleMultiplexerDriver;
+        }
+
+        /// <summary>
+        /// Helper function to return the MultiplexerDriver device belonging to the current module
+        /// Initializes module values if not yet done
+        /// </summary>
+        /// <returns>Object if existing, null otherwise</returns>
+        private MobiFlight.Config.MultiplexerDriver getOrAddModuleMultiplexerDriver(List<MobiFlightPin> freePins)
+        {
+            var multiplexerDriver = getModuleMultiplexerDriver();
+
+            // If multiplexerDriver has no users yet, initialize it
+            if (!multiplexerDriver.isInitialized()) {
+                if (freePins.Count < 4) {
+                    MessageBox.Show(i18n._tr("uiMessageNotEnoughPinsMessage"), i18n._tr("uiMessageNotEnoughPinsHint"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                String[] pins = new String[4];
+                for (var i = 0; i < 4; i++) {
+                    pins[i] = freePins.ElementAt(i).ToString();
+                }
+                freePins.RemoveRange(0, 4);
+                multiplexerDriver.Initialize(pins);     // this also registers (if first client, which we are)
+            } else {
+                multiplexerDriver.registerClient();
+            }
+            return multiplexerDriver;
+        }
+
+        /// <summary>
+        /// Helper function to unregister a deleted Mux client from module's MultiplexerDriver
+        /// </summary>
+        private void unregisterMuxClient()
+        {
+            MobiFlight.Config.MultiplexerDriver multiplexerDriver;
+            
+            multiplexerDriver = getModuleMultiplexerDriver();
+            multiplexerDriver.unregisterClient();
+            if (!multiplexerDriver.isInitialized()) {
+                moduleMultiplexerDrivers.Remove(getModuleNode().Name);
+            }
+        }
+
 
         private void MobiFlightPanel_Load(object sender, EventArgs e)
         {
@@ -811,40 +1010,130 @@ namespace MobiFlight.UI.Panels.Settings
                 }
 
             }
+
+            List<MobiFlightModule> modules = new List<MobiFlightModule>();
+
             foreach (MobiFlightModuleInfo moduleInfo in modulesForFlashing)
             {
-                MobiFlightModule module = new MobiFlightModule(new MobiFlightModuleConfig() { ComPort = moduleInfo.Port, Type = moduleInfo.Type });
-                updateFirmware(module);
+                MobiFlightModule module = new MobiFlightModule(moduleInfo.Port, moduleInfo.Board);
+                modules.Add(module);
             }
 
             foreach (MobiFlightModule module in modulesForUpdate)
             {
-                updateFirmware(module);
+                modules.Add(module);
             }
+
+            UpdateModules(modules);
+
+            if (PreselectedMobiFlightBoard != null)
+                PreSelectMobiFlightBoard(PreselectedMobiFlightBoard);
         }
 
-        protected void updateFirmware(MobiFlightModule module)
+        private void PreSelectMobiFlightBoard(MobiFlightModuleInfo preselectedMobiFlightBoard)
         {
-            String arduinoIdePath = Properties.Settings.Default.ArduinoIdePathDefault;
-            String firmwarePath = Directory.GetCurrentDirectory() + "\\firmware";
+            TreeNode resultNode = findNodeByPort(preselectedMobiFlightBoard.Port);
 
-            if (!MobiFlightFirmwareUpdater.IsValidArduinoIdePath(arduinoIdePath))
+            if (resultNode != null)
             {
-                MessageBox.Show(
-                    i18n._tr("uiMessageFirmwareCheckPath"),
-                    i18n._tr("Hint"), MessageBoxButtons.OK);
+                resultNode.Expand();
+                mfModulesTreeView.SelectedNode = resultNode;
+            }
+
+            PreselectedMobiFlightBoard = null;
+        }
+
+        private void UpdateModules(List<MobiFlightModule> modules)
+        {
+            if (modules.Count == 0) return;
+            FirmwareUpdateProcessForm.ClearModules();
+            modules.ForEach(
+                module => FirmwareUpdateProcessForm.AddModule(module)
+            );
+            
+            FirmwareUpdateProcessForm.OnBeforeFirmwareUpdate -= FirmwareUpdateProcessForm_OnBeforeFirmwareUpdate;
+            FirmwareUpdateProcessForm.OnBeforeFirmwareUpdate += FirmwareUpdateProcessForm_OnBeforeFirmwareUpdate;
+            FirmwareUpdateProcessForm.OnAfterFirmwareUpdate -= FirmwareUpdateProcessForm_OnAfterFirmwareUpdate;
+            FirmwareUpdateProcessForm.OnAfterFirmwareUpdate += FirmwareUpdateProcessForm_OnAfterFirmwareUpdate;
+            FirmwareUpdateProcessForm.OnFinished -= FirmwareUpdateProcessForm_OnFinished;
+            FirmwareUpdateProcessForm.OnFinished += FirmwareUpdateProcessForm_OnFinished;
+            FirmwareUpdateProcessForm.ShowDialog();
+        }
+
+        private void FirmwareUpdateProcessForm_OnFinished(List<MobiFlightModule> modules)
+        {
+            String Message = i18n._tr("uiMessageFirmwareUploadSuccessful");
+
+
+            TimeoutMessageDialog tmd = new TimeoutMessageDialog();
+            tmd.Width = FirmwareUpdateProcessForm.Width;
+            tmd.Height = FirmwareUpdateProcessForm.Height;
+            tmd.HasCancelButton = false;
+            tmd.StartPosition = FormStartPosition.CenterParent;
+            tmd.Text = i18n._tr("uiMessageFirmwareUploadTitle");
+
+            if (modules.Count > 0)
+            {
+                if (modules.Count > 4)
+                    tmd.Height += ((modules.Count - 4) * 12);
+
+                List<string> ModuleNames = new List<string>();
+                modules.ForEach(module => ModuleNames.Add(module.Name + " (" + module.Port + ")"));
+
+                Message = string.Format(
+                                    i18n._tr("uiMessageFirmwareUploadError"),
+                                    string.Join("\n", ModuleNames)
+                                    ); ;
+            }
+
+            tmd.Message = Message;           
+            tmd.ShowDialog();
+        }
+
+        private void FirmwareUpdateProcessForm_OnBeforeFirmwareUpdate(object sender, EventArgs e)
+        {
+            OnBeforeFirmwareUpdate?.Invoke(sender, e);
+        }
+
+        private void FirmwareUpdateProcessForm_OnAfterFirmwareUpdate(object sender, EventArgs e)
+        {
+            // update presentation in treeView
+            MobiFlightModule module = (MobiFlightModule)sender;
+
+            // If the update fails for some reason, e.g. the board definition file was missing the settings for the
+            // update, then module will be null.
+            if (module == null)
+            {
+                return;
+            }           
+
+            module.Connect();
+            MobiFlightModuleInfo newInfo = module.GetInfo() as MobiFlightModuleInfo;
+
+            // Issue 611
+            // If the board definition file is correct but the firmware failed to flash and the result is
+            // a bare module with no MobiFlight firmware on it then the serial number will be null
+            // and the module should not be refreshed.
+            if (String.IsNullOrEmpty(newInfo.Serial))
+            {
                 return;
             }
 
-            OnBeforeFirmwareUpdate?.Invoke(module, null);
-            module.Disconnect();
+            mobiflightCache.RefreshModule(module);
 
-            MobiFlightFirmwareUpdater.ArduinoIdePath = arduinoIdePath;
-            MobiFlightFirmwareUpdater.FirmwarePath = firmwarePath;
+            OnAfterFirmwareUpdate?.Invoke(module, null);
 
-            NumberOfModulesForFirmwareUpdate++;
-            firmwareUpdateBackgroundWorker.RunWorkerAsync(module);
-            FirmwareUpdateProcessForm.ShowDialog();
+            // Update the corresponding TreeView Item
+            //// Find the parent node that matches the Port
+            TreeNode moduleNode = findNodeByPort(module.Port);
+
+            if (moduleNode != null)
+            {
+                mfModulesTreeView_initNode(newInfo, moduleNode);
+                // make sure that we retrigger all events and sync the panel
+                mfModulesTreeView.SelectedNode = null;
+                mfModulesTreeView.SelectedNode = moduleNode;
+            }
         }
 
         private TreeNode findNodeByPort(string port)
@@ -861,59 +1150,6 @@ namespace MobiFlight.UI.Panels.Settings
             }
             return resultNode;
         }
-
-        void firmwareUpdateBackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            MobiFlightModule module = (MobiFlightModule)e.Argument;
-            bool UpdateResult = MobiFlightFirmwareUpdater.Update(module);
-            e.Result = module;
-        }
-
-        void firmwareUpdateBackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            NumberOfModulesForFirmwareUpdate--;
-            if (NumberOfModulesForFirmwareUpdate == 0)
-                FirmwareUpdateProcessForm.Hide();
-
-            if (e.Error != null)
-            {
-                MessageBox.Show(
-                    i18n._tr("uiMessageFirmwareUploadError"),
-                    i18n._tr("Hint"), 
-                    MessageBoxButtons.OK
-                );
-                return;
-            }
-
-            // update presentation in treeView
-            MobiFlightModule module = (MobiFlightModule)e.Result;
-
-            module.Connect();
-            MobiFlightModuleInfo newInfo = module.GetInfo() as MobiFlightModuleInfo;
-            mobiflightCache.RefreshModule(module);
-
-            OnAfterFirmwareUpdate?.Invoke(module, null);
-
-            // Update the corresponding TreeView Item
-            //// Find the parent node that matches the Port
-            TreeNode parentNode = findNodeByPort(module.Port);
-
-            if (parentNode != null)
-            {
-                mfModulesTreeView_initNode(newInfo, parentNode);
-                // make sure that we retrigger all events and sync the panel
-                mfModulesTreeView.SelectedNode = null;
-                mfModulesTreeView.SelectedNode = parentNode;
-            }
-
-            if (NumberOfModulesForFirmwareUpdate == 0)
-                MessageBox.Show(
-                    i18n._tr("uiMessageFirmwareUploadSuccessful"),
-                    i18n._tr("Hint"),
-                    MessageBoxButtons.OK
-                );
-        }
-
 
         private void displayError(Control control, String message)
         {
@@ -932,6 +1168,53 @@ namespace MobiFlight.UI.Panels.Settings
             errorProvider1.SetError(
                     control,
                     "");
+        }
+
+        private void ignoreCOMPortToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            TreeNode moduleNode = getModuleNode();
+            moduleNode.SelectedImageKey = moduleNode.ImageKey = "module-ignored";
+            MobiFlightModule module = moduleNode.Tag as MobiFlightModule;
+            addPortToIgnoreList(module.Port);
+        }
+
+        private void addPortToIgnoreList(string port)
+        {
+            List<String> ports = IgnoredComPortsTextBox.Text.Split(',').ToList();
+            if (ports.Contains(port)) return;
+
+            ports.Add(port);
+            ports.Sort();
+            IgnoredComPortsTextBox.Text = String.Join(",", ports);
+            IgnoreComPortsCheckBox.Checked = ports.Count > 0;
+
+            ShowRestartHint();
+        }
+
+        private void ShowRestartHint()
+        {
+            String msg = i18n._tr("This change will require a restart of MobiFlight to become effective.");
+            TimeoutMessageDialog.Show(msg, i18n._tr("Hint"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void dontIgnoreCOMPortToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            TreeNode moduleNode = getModuleNode();
+            MobiFlightModule module = moduleNode.Tag as MobiFlightModule;
+            removePortFormIgnoreList(module.Port);
+        }
+
+        private void removePortFormIgnoreList(string port)
+        {
+            List<String> ports = IgnoredComPortsTextBox.Text.Split(',').ToList();
+            if (!ports.Contains(port)) return;
+
+            ports.Remove(port);
+            ports.Sort();
+            IgnoredComPortsTextBox.Text = String.Join(",", ports);
+            IgnoreComPortsCheckBox.Checked = ports.Count > 0;
+
+            ShowRestartHint();
         }
     }
 }

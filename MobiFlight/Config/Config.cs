@@ -13,6 +13,7 @@ namespace MobiFlight.Config
 
         [XmlElement(typeof(Button))]
         [XmlElement(typeof(Encoder))]
+        [XmlElement(typeof(InputShiftRegister))]
         [XmlElement(typeof(LedModule))]
         [XmlElement(typeof(Output))]
         [XmlElement(typeof(Servo))]
@@ -20,6 +21,8 @@ namespace MobiFlight.Config
         [XmlElement(typeof(LcdDisplay))]
         [XmlElement(typeof(AnalogInput))]
         [XmlElement(typeof(ShiftRegister))]
+        [XmlElement(typeof(InputMultiplexer))]
+        [XmlElement(typeof(MultiplexerDriver))]
         public List<BaseDevice> Items = new List<BaseDevice>();
 
         public Config() { }
@@ -33,9 +36,12 @@ namespace MobiFlight.Config
         {
             List<String> result = new List<string>();
             String message = "";
-            
+
             foreach (BaseDevice item in Items)
             {
+                // MultiplexerDriver does not appear in this list as separate device config record
+                // Its data is embedded (redundantly) in mux client devices
+
                 String current = item.ToInternal();
                 
                 if ((message.Length + current.Length) > MaxMessageLength && message.Length > 0) {
@@ -53,6 +59,10 @@ namespace MobiFlight.Config
         public Config FromInternal(String value, bool throwException = false)
         {
             String[] items = value.Split(BaseDevice.End);
+
+            // Need to set aside the MultiplexerDriver reference (for subsequent devices) when we find it 
+            MobiFlight.Config.MultiplexerDriver multiplexerDriver = null;
+
             foreach (String item in items)
             {
                 BaseDevice currentItem = null;
@@ -124,6 +134,35 @@ namespace MobiFlight.Config
                             currentItem.FromInternal(item + BaseDevice.End);
                             break;
 
+                        case DeviceType.InputShiftRegister:
+                            currentItem = new MobiFlight.Config.InputShiftRegister();
+                            currentItem.FromInternal(item + BaseDevice.End);
+                            break;
+
+                        case DeviceType.InputMultiplexer:
+                            // Build multiplexerDriver if none found yet 
+                            if (multiplexerDriver == null) {
+                                multiplexerDriver = new MobiFlight.Config.MultiplexerDriver();
+                                // multiplexerDriver is not yet init'ed with pin numbers: the FromInternal() of the client
+                                // (in this case InputMultiplexer) will provide them
+                                // Treat the MultiplexerDriver as a regular device (add it to the items list), except it won't be shown in the GUI tree.
+                                Items.Add(multiplexerDriver);
+                            }
+                            currentItem = new MobiFlight.Config.InputMultiplexer(multiplexerDriver);
+                            currentItem.FromInternal(item + BaseDevice.End);
+
+                            break;
+
+                        // MultiplexerDriver data is bound to be included (very redundantly) in client devices;
+                        // therefore, even if there is an internal device object, there is no config message
+                        // corresponding to a MultiplexerDriver item.
+                        // If there was, we would do this:
+                        //case DeviceType.MultiplexerDriver:
+                        //    currentItem = new MobiFlight.Config.MultiplexerDriver();
+                        //    currentItem.FromInternal(item + BaseDevice.End);
+                        //    multiplexerDriver = currentItem as MobiFlight.Config.MultiplexerDriver;
+                        //    break;
+
                         case DeviceType.AnalogInput:
                             currentItem = new MobiFlight.Config.AnalogInput();
                             currentItem.FromInternal(item + BaseDevice.End);
@@ -157,7 +196,6 @@ namespace MobiFlight.Config
                 }
 
             }
-
             return this;
         }
     }

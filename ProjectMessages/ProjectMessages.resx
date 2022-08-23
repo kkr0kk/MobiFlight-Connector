@@ -293,7 +293,7 @@ You should configure them now.</value>
     <value>Copy</value>
   </data>
   <data name="uiMessageErrorOnParsingExpression" xml:space="preserve">
-    <value>An error occured on parsing your value formula. Please review and correct any errors.</value>
+    <value>An error occurred on parsing your value formula. Please review and correct any errors.</value>
   </data>
   <data name="uiMessageNoOrphanedSerialsFound" xml:space="preserve">
     <value>There are no orphaned serials in the current config.</value>
@@ -364,10 +364,12 @@ You have to provide the path to a valid Arduino IDE installation (min 1.0.5).</v
     <value>The value must not be empty.</value>
   </data>
   <data name="uiMessageUpdateArduinoOkCancel" xml:space="preserve">
-    <value>There are Arduinos connected to your PC - do you want to upload the MobiFlight Firmware to them?</value>
+    <value>Arduino boards found that are compatible with MobiFlight. To be able to use them they require the latest MobiFlight Firmware.
+
+Upload the MobiFlight Firmware now!</value>
   </data>
   <data name="uiMessageUpdateOldFirmwareOkCancel" xml:space="preserve">
-    <value>Some Mobiflight Boards have an old firmware - update them now</value>
+    <value>Some Mobiflight Boards have an old firmware - update them now?</value>
   </data>
   <data name="uiMessageFirmwareUploadSuccessful" xml:space="preserve">
     <value>The firmware update was successful!</value>
@@ -445,12 +447,6 @@ You can always enable it later again in the settings menu.</value>
   <data name="uiMessageNoSimConnectConnection" xml:space="preserve">
     <value>No active SimConnect Connection</value>
   </data>
-  <data name="uiSimConnectPanelComboBoxPresetSelect" xml:space="preserve">
-    <value>Choose a Preset</value>
-  </data>
-  <data name="uiSimConnectPanelComboBoxPresetSelectGroup" xml:space="preserve">
-    <value>Choose a Preset Group...</value>
-  </data>
   <data name="uiMessageSimConnectConnectionLost" xml:space="preserve">
     <value>The connection to SimConnect got lost.</value>
   </data>
@@ -461,6 +457,44 @@ You can always enable it later again in the settings menu.</value>
     <value>Configuration file not found. Please check path to config file.</value>
   </data>
   <data name="uiMessageFirmwareUploadError" xml:space="preserve">
-    <value>There was an error on uploading the firmware!\nEnable Debug Logging for more details.</value>
+    <value>There was an error on uploading the firmware for the board(s):
+
+{0}
+
+Check log for more details.</value>
+  </data>
+  <data name="uiMessageNoNotConnectedJoysticksInConfigFound" xml:space="preserve">
+    <value>There are no missing joysticks found.</value>
+  </data>
+  <data name="uiMessageNotConnectedJoysticksInConfigFound" xml:space="preserve">
+    <value>The following joysticks are currently not connected but referenced in the config:
+
+{0}
+
+Respective input actions won't work until they are connected and you have restarted MobiFlight.</value>
+  </data>
+  <data name="uiMessageFirmwareUpdateStatus" xml:space="preserve">
+    <value>Updating {0} on {1} (Module {2}/{3})</value>
+  </data>
+  <data name="uiMessageFirmwareUploadTitle" xml:space="preserve">
+    <value>Firmware Update</value>
+  </data>
+  <data name="uiMessageUpdateArduinoTitle" xml:space="preserve">
+    <value>Compatible boards found!</value>
+  </data>
+  <data name="uiMessageUpdateOldFirmwareTitle" xml:space="preserve">
+    <value>New Firmware Available!</value>
+  </data>
+  <data name="uiMessageNoMoreConfigReferenceAvailable" xml:space="preserve">
+    <value>You already can reference all available configs. Adding more doesn't make sense.</value>
+  </data>
+  <data name="uiMessagesSimConnectPanelMatchesFound" xml:space="preserve">
+    <value>{0} matches found.</value>
+  </data>
+  <data name="uiMessagesSimConnectPanelShowAll" xml:space="preserve">
+    <value>- show all -</value>
+  </data>
+  <data name="uiSettingsMobiFlightChangeRequiresRestart" xml:space="preserve">
+    <value>This change will require a restart of MobiFlight to become effective.</value>
   </data>
 </root>

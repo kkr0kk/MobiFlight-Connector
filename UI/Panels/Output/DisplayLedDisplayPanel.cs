@@ -14,11 +14,21 @@ namespace MobiFlight.UI.Panels
     {
         public bool WideStyle = false;
         private string filterReferenceGuid;
-        DataView RefsDataView = null; // Used to resolve names... Is there a better way? We should probably move that to some base part of mobiflight.
-
+        public event EventHandler OnLedAddressChanged;
+        
         public DisplayLedDisplayPanel()
         {
             InitializeComponent();
+            InitPanelWithDefaultSettings();
+            displayLedAddressComboBox.SelectedIndexChanged += (sender, e) =>
+            {
+                OnLedAddressChanged?.Invoke(displayLedAddressComboBox, new EventArgs());
+            };
+        }
+
+        private void InitPanelWithDefaultSettings()
+        {
+            syncFromConfig(new OutputConfigItem());
         }
 
         internal void syncFromConfig(OutputConfigItem config)
@@ -30,6 +40,9 @@ namespace MobiFlight.UI.Panels
                 {
                     // TODO: provide error message
                     Log.Instance.log("_syncConfigToForm : Exception on selecting item in Led Address ComboBox", LogSeverity.Debug);
+                } else
+                {
+                    OnLedAddressChanged?.Invoke(displayLedAddressComboBox, new EventArgs());
                 }
             }
 
@@ -61,21 +74,6 @@ namespace MobiFlight.UI.Panels
             {
                 (displayLedDecimalPointFlowLayoutPanel.Controls["displayLedDecimalPoint" + digit + "Checkbox"] as CheckBox).Checked = true;
             }
-
-            List<ListItem> configRefs = new List<ListItem>();
-            configRefs.Add(new ListItem { Value = string.Empty, Label = "<None>" });
-            foreach (DataRow refRow in RefsDataView.Table.Rows)
-            {
-
-                if (!filterReferenceGuid.Equals(refRow["guid"].ToString()))
-                {
-                    configRefs.Add(new ListItem { Value = ((Guid)refRow["guid"]).ToString(), Label = refRow["description"] as string });
-                }                
-            }
-
-            brightnessDropDown.DataSource = configRefs;
-            brightnessDropDown.DisplayMember = "Label";
-            brightnessDropDown.ValueMember = "Value";
 
             if (!string.IsNullOrEmpty(config.LedModule.DisplayLedBrightnessReference))
             {
@@ -113,7 +111,7 @@ namespace MobiFlight.UI.Panels
             displayLedConnectorComboBox.Enabled = pins.Count > 0;
         }
 
-        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        private void DisplayLedModuleSize_SelectedIndexChanged(object sender, EventArgs e)
         {
             int value = Int16.Parse((sender as ComboBox).Text);
             for (int i = 0; i < 8; i++)
@@ -150,7 +148,8 @@ namespace MobiFlight.UI.Panels
             if (displayLedAddressComboBox.SelectedValue as String != null)
                 config.LedModule.DisplayLedAddress = displayLedAddressComboBox.SelectedValue as String;
 
-            config.LedModule.DisplayLedBrightnessReference = brightnessDropDown.SelectedValue.ToString();
+            if (brightnessDropDown.SelectedValue!=null)
+                config.LedModule.DisplayLedBrightnessReference = brightnessDropDown.SelectedValue.ToString();
 
             config.LedModule.DisplayLedPadding = displayLedPaddingCheckBox.Checked;
             config.LedModule.DisplayLedReverseDigits = displayLedReverseDigitsCheckBox.Checked;
@@ -193,7 +192,21 @@ namespace MobiFlight.UI.Panels
         internal void SetConfigRefsDataView(DataView dv, string filterGuid)
         {            
             this.filterReferenceGuid = filterGuid==null?string.Empty:filterGuid;
-            RefsDataView = dv;                        
+
+            List<ListItem> configRefs = new List<ListItem>();
+            configRefs.Add(new ListItem { Value = string.Empty, Label = "<None>" });
+            foreach (DataRow refRow in dv.Table.Rows)
+            {
+
+                if (!filterReferenceGuid.Equals(refRow["guid"].ToString()))
+                {
+                    configRefs.Add(new ListItem { Value = ((Guid)refRow["guid"]).ToString(), Label = refRow["description"] as string });
+                }
+            }
+
+            brightnessDropDown.DataSource = configRefs;
+            brightnessDropDown.DisplayMember = "Label";
+            brightnessDropDown.ValueMember = "Value";
         }
     }
 }

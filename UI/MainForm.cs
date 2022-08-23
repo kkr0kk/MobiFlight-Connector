@@ -21,6 +21,8 @@ using MobiFlight.SimConnectMSFS;
 using MobiFlight.UpdateChecker;
 using MobiFlight.Base;
 using Microsoft.ApplicationInsights.DataContracts;
+using MobiFlight.xplane;
+using MobiFlight.HubHop;
 
 namespace MobiFlight.UI
 {
@@ -34,6 +36,7 @@ namespace MobiFlight.UI
         /// the currently used filename of the loaded config file
         /// </summary>
         private string currentFileName = null;
+        private ConfigFile configFile = null;
 
         private CmdLineParams cmdLineParams;
 
@@ -52,13 +55,14 @@ namespace MobiFlight.UI
 
         private void InitializeLogging()
         {
-            LogAppenderTextBox logAppenderTextBox = new LogAppenderTextBox(logTextBox);
+            LogAppenderLogPanel logAppenderTextBox = new LogAppenderLogPanel(logPanel1);
             LogAppenderFile logAppenderFile = new LogAppenderFile();
 
             Log.Instance.AddAppender(logAppenderTextBox);
             Log.Instance.AddAppender(logAppenderFile);
+            Log.Instance.LogJoystickAxis = Properties.Settings.Default.LogJoystickAxis;
             Log.Instance.Enabled = Properties.Settings.Default.LogEnabled;
-            logTextBox.Visible = Log.Instance.Enabled;
+            logPanel1.Visible = Log.Instance.Enabled;
             logSplitter.Visible = Log.Instance.Enabled;
 
             try
@@ -92,6 +96,9 @@ namespace MobiFlight.UI
             // finally set up logging (based on settings)
             InitializeLogging();
 
+            // Initialize the board configurations
+            BoardDefinitions.Load();
+
             // configure tracking correctly
             InitializeTracking();
         }
@@ -106,6 +113,7 @@ namespace MobiFlight.UI
             panelMain.Visible = false;
             startupPanel.Visible = true;
             menuStrip.Enabled = false;
+            toolStrip1.Enabled = false;
         }
 
         private void MainForm_Shown(object sender, EventArgs e)
@@ -133,6 +141,7 @@ namespace MobiFlight.UI
             execManager.OnStarted += new EventHandler(timer_Started);
 
             execManager.OnSimAvailable += ExecManager_OnSimAvailable;
+            execManager.OnSimUnavailable += ExecManager_OnSimUnavailable;
             execManager.OnSimCacheConnectionLost += new EventHandler(fsuipcCache_ConnectionLost);
             execManager.OnSimCacheConnected += new EventHandler(fsuipcCache_Connected);
             execManager.OnSimCacheConnected += new EventHandler(checkAutoRun);
@@ -148,9 +157,6 @@ namespace MobiFlight.UI
 
             execManager.getMobiFlightModuleCache().ModuleConnecting += MainForm_ModuleConnected;
 
-            execManager.OfflineMode = Properties.Settings.Default.OfflineMode;
-
-            if (execManager.OfflineMode) OfflineModeIconToolStripStatusLabel.Image = Properties.Resources.lightbulb_on;
             FsuipcToolStripMenuItem.Image = Properties.Resources.warning;
             simConnectToolStripMenuItem.Image = Properties.Resources.warning;
 
@@ -162,6 +168,7 @@ namespace MobiFlight.UI
 
             runToolStripButton.Enabled = false;
             runTestToolStripButton.Enabled = false;
+            settingsToolStripButton.Enabled = false;
             updateNotifyContextMenu(false);
 
             // Reset the Title of the Main Window so that it displays the Version too.
@@ -178,6 +185,7 @@ namespace MobiFlight.UI
             inputConfigPanel.SettingsChanged += InputConfigPanel_SettingsChanged;
             inputConfigPanel.SettingsDialogRequested += ConfigPanel_SettingsDialogRequested;
             inputConfigPanel.OutputDataSetConfig = outputConfigPanel.DataSetConfig;
+            inputConfigPanel.SettingsChanged += execManager.OnInputConfigSettingsChanged;
 
             if (System.Threading.Thread.CurrentThread.CurrentUICulture.TwoLetterISOLanguageName != "de")
             {
@@ -212,14 +220,19 @@ namespace MobiFlight.UI
         {
             int i = Properties.Settings.Default.Started;
             WelcomeDialog wd = new WelcomeDialog();
+            wd.ReleaseNotesClicked += (sender, e) =>
+            {
+                Process.Start("https://www.mobiflight.com/en/download.html#Release_Notes");
+            };
+
             wd.StartPosition = FormStartPosition.CenterParent;
             wd.Text = String.Format(wd.Text, DisplayVersion());
             wd.ShowDialog();
             this.BringToFront();
 
             // MSFS2020
-            WasmModuleUpdater udpater = new WasmModuleUpdater();
-            if (udpater.AutoDetectCommunityFolder())
+            WasmModuleUpdater updater = new WasmModuleUpdater();
+            if (updater.AutoDetectCommunityFolder())
             {
                 // MSFS2020 installed
                 Msfs2020StartupForm msfsForm = new Msfs2020StartupForm();
@@ -250,7 +263,12 @@ namespace MobiFlight.UI
 
         private void ConfigPanel_SettingsDialogRequested(object sender, EventArgs e)
         {
-            settingsToolStripMenuItem_Click(sender, null);
+            MobiFlightModule module = (sender as MobiFlightModule);
+            MobiFlightModuleInfo moduleInfo = null;
+
+            if (module != null) moduleInfo = module.ToMobiFlightModuleInfo();
+
+            ShowSettingsDialog("mobiFlightTabPage", moduleInfo, null, null);
         }
 
         private void InputConfigPanel_SettingsChanged(object sender, EventArgs e)
@@ -288,7 +306,13 @@ namespace MobiFlight.UI
             startupPanel.UpdateProgressBar(100);
             panelMain.Visible = true;
             startupPanel.Visible = false;
+
             menuStrip.Enabled = true;
+            toolStrip1.Enabled = true;
+
+            settingsToolStripButton.Enabled = true;
+            runToolStripButton.Enabled = RunIsAvailable();
+            runTestToolStripButton.Enabled = TestRunIsAvailable();
 
             AutoUpdateChecker.CheckForUpdate(false, true);
 
@@ -300,7 +324,7 @@ namespace MobiFlight.UI
 
         private void CheckForWasmModuleUpdate()
         {
-            WasmModuleUpdater udpater = new WasmModuleUpdater();
+            WasmModuleUpdater updater = new WasmModuleUpdater();
             
         }
 
@@ -314,18 +338,17 @@ namespace MobiFlight.UI
 
             foreach (MobiFlightModule module in mfCache.GetModules())
             {
-                if (module.Type == MobiFlightModuleInfo.TYPE_MEGA ||
-                    module.Type == MobiFlightModuleInfo.TYPE_MICRO ||
-                    module.Type == MobiFlightModuleInfo.TYPE_UNO
-                    )
+                if (module.Board.Info.CanInstallFirmware)
                 {
-                    Version latestVersion = new Version(MobiFlightModuleInfo.LatestFirmwareMega);
-                    if (module.Type == MobiFlightModuleInfo.TYPE_MICRO)
-                        latestVersion = new Version(MobiFlightModuleInfo.LatestFirmwareMicro);
-                    if (module.Type == MobiFlightModuleInfo.TYPE_UNO)
-                        latestVersion = new Version(MobiFlightModuleInfo.LatestFirmwareUno);
-
-                    Version currentVersion = new Version(module.Version != "n/a" ? module.Version : "0.0.0");
+                    Version latestVersion = new Version(module.Board.Info.LatestFirmwareVersion);
+                    Version currentVersion;
+                    try { 
+                        currentVersion = new Version(module.Version != null ? module.Version : "0.0.0");
+                    }
+                    catch (Exception ex)
+                    {
+                        currentVersion = new Version("0.0.0");
+                    }
                     if (currentVersion.CompareTo(latestVersion) < 0)
                     {
                         // Update needed!!!
@@ -336,10 +359,9 @@ namespace MobiFlight.UI
 
             foreach (MobiFlightModuleInfo moduleInfo in modules)
             {
-                if (moduleInfo.Type == MobiFlightModuleInfo.TYPE_ARDUINO_MEGA ||
-                    moduleInfo.Type == MobiFlightModuleInfo.TYPE_ARDUINO_MICRO ||
-                    moduleInfo.Type == MobiFlightModuleInfo.TYPE_ARDUINO_UNO
-                    )
+                if (moduleInfo.Type == "Ignored") continue;
+
+                if (moduleInfo.Board.Info.CanInstallFirmware && !moduleInfo.HasMfFirmware())
                 {
                     modulesForFlashing.Add(moduleInfo);
                 }
@@ -360,49 +382,72 @@ namespace MobiFlight.UI
 
             if (modulesForUpdate.Count > 0)
             {
-                if (MessageBox.Show(
-                    i18n._tr("uiMessageUpdateOldFirmwareOkCancel"),
-                    i18n._tr("Hint"),
-                    MessageBoxButtons.OKCancel) == DialogResult.OK)
+                TimeoutMessageDialog tmd = new TimeoutMessageDialog();
+                tmd.StartPosition = FormStartPosition.CenterParent;
+                tmd.DefaultDialogResult = DialogResult.Cancel;
+                tmd.Message = i18n._tr("uiMessageUpdateOldFirmwareOkCancel");
+                tmd.Text = i18n._tr("uiMessageUpdateOldFirmwareTitle");
+                
+                if (tmd.ShowDialog() == DialogResult.OK)
                 {
-                    SettingsDialog dlg = new SettingsDialog(execManager);
-                    dlg.StartPosition = FormStartPosition.CenterParent;
-                    (dlg.Controls["tabControl1"] as TabControl).SelectTab("mobiFlightTabPage"); // = (dlg.Controls["tabControl1"] as TabControl).Controls[2] as TabPage;
-                    dlg.MobiFlightModulesForUpdate = modulesForUpdate;
-                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    if (ShowSettingsDialog("mobiFlightTabPage", null, null, modulesForUpdate) == System.Windows.Forms.DialogResult.OK)
                     {
                     }
                 };
             }
 
+            // this is only for non mobiflight boards
             if (Properties.Settings.Default.FwAutoUpdateCheck && modulesForFlashing.Count > 0)
             {
-                DialogResult dr = MessageBox.Show(
-                    i18n._tr("uiMessageUpdateArduinoOkCancel"),
-                    i18n._tr("Hint"),
-                    MessageBoxButtons.OKCancel);
+                TimeoutMessageDialog tmd = new TimeoutMessageDialog();
+                tmd.StartPosition = FormStartPosition.CenterParent;
+                tmd.DefaultDialogResult = DialogResult.Cancel;
+                tmd.Message = i18n._tr("uiMessageUpdateArduinoOkCancel");
+                tmd.Text = i18n._tr("uiMessageUpdateOldFirmwareTitle");
 
-                if (dr == DialogResult.OK)
+                if (tmd.ShowDialog() == DialogResult.OK)
                 {
-                    SettingsDialog dlg = new SettingsDialog(execManager);
-                    dlg.StartPosition = FormStartPosition.CenterParent;
-                    (dlg.Controls["tabControl1"] as TabControl).SelectTab("mobiFlightTabPage"); // = (dlg.Controls["tabControl1"] as TabControl).Controls[2] as TabPage;
-                    dlg.MobiFlightModulesForFlashing = modulesForFlashing;
-                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    if (ShowSettingsDialog("mobiFlightTabPage", null, modulesForFlashing, null) == System.Windows.Forms.DialogResult.OK)
                     {
                     }
                 }
                 else
                 {
-                    if (MessageBox.Show(
-                        i18n._tr("uiMessageUpdateArduinoFwAutoDisableYesNo"),
-                        i18n._tr("Hint"),
-                        MessageBoxButtons.YesNo) == DialogResult.Yes)
+                    tmd.StartPosition = FormStartPosition.CenterParent;
+                    tmd.DefaultDialogResult = DialogResult.Cancel;
+                    tmd.Message = i18n._tr("uiMessageUpdateArduinoFwAutoDisableYesNo");
+                    tmd.Text = i18n._tr("Hint");
+
+                    if (tmd.ShowDialog() == DialogResult.OK)
                     {
                         Properties.Settings.Default.FwAutoUpdateCheck = false;
                     };
                 }
             }
+        }
+
+        private DialogResult ShowSettingsDialog(String SelectedTab, MobiFlightModuleInfo SelectedBoard, List<MobiFlightModuleInfo> BoardsForFlashing, List<MobiFlightModule> BoardsForUpdate)
+        {
+            SettingsDialog dlg = new SettingsDialog(execManager);
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            switch(SelectedTab)
+            {
+                case "mobiFlightTabPage":
+                    dlg.tabControl1.SelectedTab = dlg.mobiFlightTabPage;
+                    break;
+                case "ArcazeTabPage":
+                    dlg.tabControl1.SelectedTab = dlg.ArcazeTabPage;
+                    break;
+            }
+            if (SelectedBoard != null)
+                dlg.PreselectedBoard = SelectedBoard;
+
+            if (BoardsForFlashing != null)
+                dlg.MobiFlightModulesForFlashing = BoardsForFlashing;
+
+            if (BoardsForUpdate != null)
+                dlg.MobiFlightModulesForUpdate = BoardsForUpdate;
+            return dlg.ShowDialog();
         }
 
         // this performs the update of the existing user settings 
@@ -411,7 +456,17 @@ namespace MobiFlight.UI
         {
             if (Properties.Settings.Default.UpgradeRequired)
             {
-                Properties.Settings.Default.Upgrade();
+                try
+                {
+                    Properties.Settings.Default.Upgrade();
+                }
+                catch
+                {
+                    // If the properties file is corrupted for some reason catch the exception and
+                    // reset back to a default version.
+
+                    Properties.Settings.Default.Reset();
+                }
                 Properties.Settings.Default.UpgradeRequired = false;
                 Properties.Settings.Default.StartedTotal += Properties.Settings.Default.Started;
                 Properties.Settings.Default.Started = 0;
@@ -429,39 +484,6 @@ namespace MobiFlight.UI
             execManager.AutoConnectStart();
         }
 
-        private DialogResult ShowMessageThreadSafe(string msg, string title, MessageBoxButtons buttons, MessageBoxIcon icon)
-        {
-            return MessageBox.Show(this, msg, title, buttons);
-        }
-
-        
-
-        /*
-        private void CheckForUpdate(bool force, bool silent = false)
-        {
-            AutoUpdater.Mandatory = force;
-            AutoUpdater.ShowSkipButton = true;
-            AutoUpdater.ShowRemindLaterButton = true;
-            AutoUpdater.UpdateFormSize = new System.Drawing.Size(600, 500);
-
-            if (Properties.Settings.Default.CacheId == "0") Properties.Settings.Default.CacheId = Guid.NewGuid().ToString();
-
-            String trackingParams = "?cache=" + Properties.Settings.Default.CacheId + "-" + Properties.Settings.Default.Started;
-
-            Log.Instance.log("Checking for updates", LogSeverity.Info);
-            AutoUpdater.RunUpdateAsAdmin = true;
-            SilentUpdateCheck = silent;
-
-            String updateUrl = MobiFlightUpdateUrl;
-            if (Properties.Settings.Default.BetaUpdates) updateUrl = MobiFlightUpdateBetasUrl;
-#if DEBUG
-            if (Properties.Settings.Default.BetaUpdates) updateUrl = MobiFlightUpdateDebugUrl;
-#endif
-            AutoUpdater.DownloadPath = Environment.CurrentDirectory;
-            AutoUpdater.Start(updateUrl + trackingParams + "1");
-        }
-        */
-
         void execManager_OnTestModeException(object sender, EventArgs e)
         {
             stopTestToolStripButton_Click(null, null);
@@ -478,20 +500,18 @@ namespace MobiFlight.UI
             if (e.SettingName == "PollInterval")
             {
                 // set FSUIPC update interval
-                execManager.SetFsuipcInterval((int)e.NewValue);
-            }
-
-            if (e.SettingName == "OfflineMode")
-            {
-                execManager.OfflineMode = (bool)e.NewValue;
-                execManager.ReconnectSim();
-                if (execManager.OfflineMode) OfflineModeIconToolStripStatusLabel.Image = Properties.Resources.lightbulb_on;
-                else OfflineModeIconToolStripStatusLabel.Image = Properties.Resources.lightbulb;
+                execManager.SetPollInterval((int)e.NewValue);
             }
 
             if (e.SettingName == "CommunityFeedback")
             {
                 AppTelemetry.Instance.Enabled = Properties.Settings.Default.CommunityFeedback;
+            }
+
+            if (e.SettingName == "LogEnabled")
+            {
+                logPanel1.Visible = (bool) e.NewValue;
+                logSplitter.Visible = (bool) e.NewValue;
             }
         }
 
@@ -562,14 +582,8 @@ namespace MobiFlight.UI
                                 MessageBoxIcon.Exclamation,
                                 MessageBoxDefaultButton.Button1) == System.Windows.Forms.DialogResult.OK)
                 {
-                    SettingsDialog dlg = new SettingsDialog(execManager);
-                    dlg.StartPosition = FormStartPosition.CenterParent;
-                    (dlg.Controls["tabControl1"] as TabControl).SelectedTab = (dlg.Controls["tabControl1"] as TabControl).Controls[1] as TabPage;
-                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    if (ShowSettingsDialog("ArcazeTabPage", null, null, null) == System.Windows.Forms.DialogResult.OK)
                     {
-                        Properties.Settings.Default.Save();
-                        logTextBox.Visible = Log.Instance.Enabled;
-                        logSplitter.Visible = Log.Instance.Enabled;
                     }
                 }
             }           
@@ -598,7 +612,7 @@ namespace MobiFlight.UI
         {
             ModuleStatusIconToolStripLabel.Image = Properties.Resources.check;
             fillComboBoxesWithArcazeModules();
-            runTestToolStripButton.Enabled = execManager.ModulesConnected();
+            runTestToolStripButton.Enabled = TestRunIsAvailable();
         }
 
         /// <summary>
@@ -606,7 +620,9 @@ namespace MobiFlight.UI
         /// </summary>
         private bool RunIsAvailable()
         {
-            return (execManager.OfflineMode || execManager.SimConnected()) && execManager.ModulesConnected() && !execManager.IsStarted() && !execManager.TestModeIsStarted();
+            return 
+                // We are not already running
+                !execManager.IsStarted() && !execManager.TestModeIsStarted();
         }
 
         /// <summary>
@@ -671,43 +687,103 @@ namespace MobiFlight.UI
             noSimRunningToolStripMenuItem.Image = Properties.Resources.check;
         }
 
+        private void ExecManager_OnSimUnavailable(object sender, EventArgs e)
+        {
+            FlightSimType flightSim = (FlightSimType)sender;
+
+            noSimRunningToolStripMenuItem.Text = "No sim running.";
+            noSimRunningToolStripMenuItem.Image = Properties.Resources.warning;
+        }
+
         /// <summary>
         /// updates the UI with appropriate icon states
         /// </summary>        
         void fsuipcCache_Connected(object sender, EventArgs e)
         {
+            // Typically the information in this static object is correct
+            // only in the case of FSUIPC it might actually be not correct
+            // because we can have a native connection and a fsuipc connection at the same time
+            FlightSimConnectionMethod CurrentConnectionMethod = FlightSim.FlightSimConnectionMethod;
+            FlightSimType CurrentFlightSimType = FlightSim.FlightSimType;
+
             if (sender.GetType() == typeof(SimConnectCache) && FlightSim.FlightSimType == FlightSimType.MSFS2020)
             {
                 noSimRunningToolStripMenuItem.Text = "MSFS2020 Detected";
-                simConnectToolStripMenuItem.Text = "WASM Module (MSFS2020)";
-                simConnectToolStripMenuItem.Image = Properties.Resources.check;
-                AppTelemetry.Instance.TrackFlightSimConnected(FlightSim.FlightSimType.ToString(), "SimConnect");
-            }
 
+                if ((sender as SimConnectCache).IsSimConnectConnected())
+                {
+                    simConnectToolStripMenuItem.Text = "SimConnect OK. Waiting for WASM Module. (MSFS2020)";
+                    simConnectToolStripMenuItem.Image = Properties.Resources.warning;
+                    Log.Instance.log("Connected to SimConnect (MSFS2020).", LogSeverity.Info);
+                }
+
+                if ((sender as SimConnectCache).IsConnected()) { 
+                    simConnectToolStripMenuItem.Text = "WASM Module (MSFS2020)";
+                    simConnectToolStripMenuItem.Image = Properties.Resources.check;
+                    Log.Instance.log("Connected to WASM Module (MSFS2020).", LogSeverity.Info);
+                }
+
+                AppTelemetry.Instance.TrackFlightSimConnected(FlightSim.FlightSimType.ToString(), FlightSimConnectionMethod.SIMCONNECT.ToString());
+                Log.Instance.log(
+                    $"{FlightSim.SimNames[FlightSim.FlightSimType].ToString()} detected. " +
+                    $"[{FlightSim.SimConnectionNames[FlightSim.FlightSimConnectionMethod].ToString()}]",
+                    LogSeverity.Info
+                );
+            }
+            else if (sender.GetType() == typeof(XplaneCache) && FlightSim.FlightSimType == FlightSimType.XPLANE)
+            {
+                noSimRunningToolStripMenuItem.Text = "X-Plane Detected";
+                if ((sender as XplaneCache).IsConnected())
+                {
+                    simConnectToolStripMenuItem.Text = FlightSim.SimConnectionNames[FlightSim.FlightSimConnectionMethod].ToString();
+                    simConnectToolStripMenuItem.Image = Properties.Resources.check;
+                }
+
+                AppTelemetry.Instance.TrackFlightSimConnected(FlightSim.FlightSimType.ToString(), FlightSimConnectionMethod.XPLANE.ToString());
+                Log.Instance.log(
+                    $"{FlightSim.SimNames[FlightSim.FlightSimType].ToString()} detected. " +
+                    $"[{FlightSim.SimConnectionNames[FlightSim.FlightSimConnectionMethod].ToString()}]", 
+                    LogSeverity.Info
+                );
+            }
             else if (sender.GetType() == typeof(Fsuipc2Cache)) { 
 
                 Fsuipc2Cache c = sender as Fsuipc2Cache;
                 switch (FlightSim.FlightSimConnectionMethod)
                 {
                     case FlightSimConnectionMethod.FSUIPC:
+                        CurrentConnectionMethod = FlightSimConnectionMethod.FSUIPC;
                         FsuipcToolStripMenuItem.Text = i18n._tr("fsuipcStatus") + " ("+ FlightSim.FlightSimType.ToString() +")";
                         break;
 
+                    case FlightSimConnectionMethod.XPLANE:
                     case FlightSimConnectionMethod.XPUIPC:
+                        CurrentConnectionMethod = FlightSimConnectionMethod.XPUIPC;
                         FsuipcToolStripMenuItem.Text = "XPUIPC Status";
                         break;
 
                     case FlightSimConnectionMethod.WIDECLIENT:
+                        CurrentConnectionMethod = FlightSimConnectionMethod.WIDECLIENT;
                         FsuipcToolStripMenuItem.Text = "WideClient Status";
                         break;
                 }
                 FsuipcToolStripMenuItem.Image = Properties.Resources.check;
                 AppTelemetry.Instance.TrackFlightSimConnected(FlightSim.FlightSimType.ToString(), c.FlightSimConnectionMethod.ToString());
+                Log.Instance.log(
+                    $"{FlightSim.SimNames[FlightSim.FlightSimType].ToString()} detected. " +
+                    $"[{FlightSim.SimConnectionNames[CurrentConnectionMethod].ToString()}]", 
+                    LogSeverity.Info
+                );
             }
 
-            if (execManager.SimConnected())
+            if ((sender as CacheInterface).IsConnected())
             {
                 SimConnectionIconStatusToolStripStatusLabel.Image = Properties.Resources.check;
+                Log.Instance.log(
+                    $"Connected to {FlightSim.SimNames[CurrentFlightSimType].ToString()}. " +
+                    $"[{FlightSim.SimConnectionNames[CurrentConnectionMethod].ToString()}]", 
+                    LogSeverity.Info
+                );
             }
 
             runToolStripButton.Enabled = RunIsAvailable();
@@ -750,8 +826,8 @@ namespace MobiFlight.UI
         /// </summary>
         void timer_Started(object sender, EventArgs e)
         {
-            runToolStripButton.Enabled  = false;
-            runTestToolStripButton.Enabled = false;
+            runToolStripButton.Enabled  = RunIsAvailable();
+            runTestToolStripButton.Enabled = TestRunIsAvailable();
             stopToolStripButton.Enabled = true;
             updateNotifyContextMenu(execManager.IsStarted());
         } //timer_Started()
@@ -761,11 +837,16 @@ namespace MobiFlight.UI
         /// </summary>
         void timer_Stopped(object sender, EventArgs e)
         {
-            runToolStripButton.Enabled = (execManager.OfflineMode || (execManager.SimConnected())) && execManager.ModulesConnected() && !execManager.TestModeIsStarted();
-            runTestToolStripButton.Enabled = execManager.ModulesConnected() && !execManager.TestModeIsStarted();
+            runToolStripButton.Enabled = RunIsAvailable();
+            runTestToolStripButton.Enabled = TestRunIsAvailable();
             stopToolStripButton.Enabled = false;
             updateNotifyContextMenu(execManager.IsStarted());
         } //timer_Stopped
+
+        private bool TestRunIsAvailable()
+        {
+            return execManager.ModulesConnected() && !execManager.TestModeIsStarted() && !execManager.IsStarted();
+        }
 
         /// <summary>
         /// Timer eventhandler
@@ -802,7 +883,10 @@ namespace MobiFlight.UI
 #if MOBIFLIGHT
             foreach (IModuleInfo module in execManager.getMobiFlightModuleCache().getModuleInfo())
             {
-                moduleToolStripDropDownButton.DropDownItems.Add(module.Name + "/ " + module.Serial);
+                ToolStripDropDownItem item = new ToolStripMenuItem($"{module.Name} ({module.Port})");
+                item.Tag = module;
+                item.Click += statusToolStripMenuItemClick;
+                moduleToolStripDropDownButton.DropDownItems.Add(item);
                 modulesFound = true;
             }
 #endif
@@ -813,6 +897,13 @@ namespace MobiFlight.UI
             // only enable button if modules are available            
             return (modulesFound);
         } //fillComboBoxesWithArcazeModules()
+
+        private void statusToolStripMenuItemClick(object sender, EventArgs e)
+        {
+            MobiFlightModuleInfo moduleInfo = (sender as ToolStripMenuItem).Tag as MobiFlightModuleInfo;
+
+            ShowSettingsDialog("mobiFlightTabPage", moduleInfo, null, null);
+        }
 
         /// <summary>
         /// toggles the current timer when user clicks on respective run/stop buttons
@@ -841,7 +932,6 @@ namespace MobiFlight.UI
             catch (Exception e)
             {
                 // do nothing
-                // MessageBox.Show(e.Message);
                 Log.Instance.log("MainForm.updateNotifyContextMenu() : " + e.Message, LogSeverity.Warn);
             }
         }
@@ -853,7 +943,7 @@ namespace MobiFlight.UI
         {
             if (this.WindowState != FormWindowState.Minimized)
             {
-                MessageBox.Show(msg, i18n._tr("Hint"), MessageBoxButtons.OK, MessageBoxIcon.Warning); 
+                TimeoutMessageDialog.Show(msg, i18n._tr("Hint"), MessageBoxButtons.OK, MessageBoxIcon.Warning); 
             }
             else
             {
@@ -1052,7 +1142,7 @@ namespace MobiFlight.UI
                 inputConfigPanel.InputDataSetConfig.Clear();
             }
 
-            ConfigFile configFile = new ConfigFile(fileName);
+            configFile = new ConfigFile(fileName);
             try
             {
                 // refactor!!!
@@ -1086,22 +1176,68 @@ namespace MobiFlight.UI
                 currentFileName = fileName;
                 _setFilenameInTitle(fileName);
                 _storeAsRecentFile(fileName);
-            }
 
-            // set the button back to "disabled"
-            // since due to initiliazing the dataSet
-            // it will automatically gets enabled
-            saveToolStripButton.Enabled = false;
+                // set the button back to "disabled"
+                // since due to initiliazing the dataSet
+                // it will automatically gets enabled
+                saveToolStripButton.Enabled = false;
+            } else
+            {
+                // indicate that the merge changed
+                // the current config and that the user
+                saveToolStripButton.Enabled = true;
+            }
 
             // always put this after "normal" initialization
             // savetoolstripbutton may be set to "enabled"
             // if user has changed something
             _checkForOrphanedSerials( false );
+            _checkForOrphanedJoysticks( false );
 
             // Track config loaded event
             AppTelemetry.Instance.ConfigLoaded(configFile);
             AppTelemetry.Instance.TrackBoardStatistics(execManager);
             AppTelemetry.Instance.TrackSettings();
+        }
+
+        private void _checkForOrphanedJoysticks(bool showNotNecessaryMessage)
+        {
+            List<string> serials = new List<string>();
+            List<string> NotConnectedJoysticks = new List<string>();
+
+            foreach (Joystick j in execManager.GetJoystickManager().GetJoysticks())
+            {
+                serials.Add(j.Name + " / " + j.Serial);
+            }
+
+            if (serials.Count == 0) return;
+            if (configFile == null) return;
+
+            foreach (InputConfigItem item in configFile.GetInputConfigItems())
+            {
+                if (item.ModuleSerial.Contains(Joystick.SerialPrefix) &&
+                    !serials.Contains(item.ModuleSerial) && 
+                    !NotConnectedJoysticks.Contains(item.ModuleSerial)) { 
+                    NotConnectedJoysticks.Add(item.ModuleSerial);
+                }
+            }
+
+            if (NotConnectedJoysticks.Count>0)
+            {
+                TimeoutMessageDialog tmd = new TimeoutMessageDialog();
+                tmd.HasCancelButton = false;
+                tmd.StartPosition = FormStartPosition.CenterParent;
+                tmd.Message = string.Format(
+                                    i18n._tr("uiMessageNotConnectedJoysticksInConfigFound"),
+                                    string.Join("\n", NotConnectedJoysticks)
+                                    );
+                tmd.Text = i18n._tr("Hint");
+                tmd.ShowDialog();
+            }
+            else if (showNotNecessaryMessage)
+            {
+                TimeoutMessageDialog.Show(i18n._tr("uiMessageNoNotConnectedJoysticksInConfigFound"), i18n._tr("Hint"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private void _restoreValuesInGridView()
@@ -1135,7 +1271,7 @@ namespace MobiFlight.UI
                 }
                 else if (showNotNecessaryMessage)
                 {
-                    MessageBox.Show(i18n._tr("uiMessageNoOrphanedSerialsFound"), i18n._tr("Hint"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    TimeoutMessageDialog.Show(i18n._tr("uiMessageNoOrphanedSerialsFound"), i18n._tr("Hint"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception e) {
@@ -1327,8 +1463,8 @@ namespace MobiFlight.UI
             stopToolStripButton.Visible = false;
             stopTestToolStripButton.Visible = true;
             stopTestToolStripButton.Enabled = true;
-            runTestToolStripButton.Enabled = false;
-            runToolStripButton.Enabled = false;
+            runTestToolStripButton.Enabled = TestRunIsAvailable();
+            runToolStripButton.Enabled = RunIsAvailable();
         }
 
         /// <summary>
@@ -1351,27 +1487,14 @@ namespace MobiFlight.UI
             stopToolStripButton.Visible = true;
             stopTestToolStripButton.Visible = false;
             stopTestToolStripButton.Enabled = false;
-            runTestToolStripButton.Enabled = true;
-            runToolStripButton.Enabled = (execManager.OfflineMode || (execManager.SimConnected())) && execManager.ModulesConnected() && !execManager.TestModeIsStarted();
+            runTestToolStripButton.Enabled = TestRunIsAvailable();
+            runToolStripButton.Enabled = RunIsAvailable();
         }
 
         private void settingsToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            // TODO: refactor dependency to module cache
-            SettingsDialog dialog = new SettingsDialog(execManager);
-            dialog.StartPosition = FormStartPosition.CenterParent;
-            if (sender is InputConfigWizard || sender is ConfigWizard)
+            if (ShowSettingsDialog("GeneralTabPage", null, null, null) == System.Windows.Forms.DialogResult.OK)
             {
-                // show the mobiflight tab page
-                dialog.tabControl1.SelectedTab = dialog.mobiFlightTabPage;
-            }
-
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-                Properties.Settings.Default.Save();
-                // TODO: refactor
-                logTextBox.Visible = Log.Instance.Enabled;
-                logSplitter.Visible = Log.Instance.Enabled;
 #if ARCAZE
                 execManager.updateModuleSettings(execManager.getModuleCache().GetArcazeModuleSettings());
 #endif
@@ -1506,7 +1629,7 @@ namespace MobiFlight.UI
 
                 if (!updater.AutoDetectCommunityFolder())
                 {
-                    MessageBox.Show(
+                    TimeoutMessageDialog.Show(
                        i18n._tr("uiMessageWasmUpdateCommunityFolderNotFound"),
                        i18n._tr("uiMessageWasmUpdater"),
                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1515,7 +1638,7 @@ namespace MobiFlight.UI
 
                 if (!updater.WasmModulesAreDifferent())
                 {
-                    MessageBox.Show(
+                    TimeoutMessageDialog.Show(
                        i18n._tr("uiMessageWasmUpdateAlreadyInstalled"),
                        i18n._tr("uiMessageWasmUpdater"),
                        MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1524,7 +1647,7 @@ namespace MobiFlight.UI
 
                 if (updater.InstallWasmModule())
                 {
-                    MessageBox.Show(
+                    TimeoutMessageDialog.Show(
                        i18n._tr("uiMessageWasmUpdateInstallationSuccessful"),
                        i18n._tr("uiMessageWasmUpdater"),
                        MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1537,7 +1660,7 @@ namespace MobiFlight.UI
             }
 
             // We only get here in case of an error.
-            MessageBox.Show(
+            TimeoutMessageDialog.Show(
                 i18n._tr("uiMessageWasmUpdateInstallationError"),
                 i18n._tr("uiMessageWasmUpdater"),
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -1549,7 +1672,7 @@ namespace MobiFlight.UI
 
             if (!updater.AutoDetectCommunityFolder())
             {
-                MessageBox.Show(
+                TimeoutMessageDialog.Show(
                    i18n._tr("uiMessageWasmUpdateCommunityFolderNotFound"),
                    i18n._tr("uiMessageWasmUpdater"),
                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1558,14 +1681,16 @@ namespace MobiFlight.UI
 
             if (updater.InstallWasmEvents())
             {
-                MessageBox.Show(
+                Msfs2020HubhopPresetListSingleton.Instance.Clear();
+
+                TimeoutMessageDialog.Show(
                    i18n._tr("uiMessageWasmEventsInstallationSuccessful"),
                    i18n._tr("uiMessageWasmUpdater"),
                    MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
-                MessageBox.Show(
+                TimeoutMessageDialog.Show(
                    i18n._tr("uiMessageWasmEventsInstallationError"),
                    i18n._tr("uiMessageWasmUpdater"),
                    MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -1577,19 +1702,19 @@ namespace MobiFlight.UI
             Process.Start("https://discord.gg/U28QeEJpBV");
         }
 
-        private void toolStripButton2_Click(object sender, EventArgs e)
+        private void StatusBarToolStripButton_Click(object sender, EventArgs e)
         {
-            SettingsDialog dlg = new SettingsDialog(execManager);
-            dlg.StartPosition = FormStartPosition.CenterParent;
-            (dlg.Controls["tabControl1"] as TabControl).SelectTab("mobiFlightTabPage");
-            if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-            }
+            ShowSettingsDialog("mobiFlightTabPage", null, null, null);
         }
 
         private void YouTubeToolStripButton_Click(object sender, EventArgs e)
         {
             Process.Start("https://www.youtube.com/channel/UCxsoCWDKRyu3MpQKNZEXUYA");
+        }
+
+        private void HubHopToolStripButton_Click(object sender, EventArgs e)
+        {
+            Process.Start("https://hubhop.mobiflight.com/");
         }
     }
 

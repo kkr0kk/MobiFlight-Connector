@@ -8,6 +8,8 @@ using MobiFlight;
 using MobiFlight.OutputConfig;
 using MobiFlight.Base;
 using MobiFlight.Config;
+using MobiFlight.InputConfig;
+using MobiFlight.xplane;
 
 namespace MobiFlight
 {
@@ -21,34 +23,40 @@ namespace MobiFlight
         
         // this implements the FSUIPC Config Item Interface
         // It would be nicer to have an aggregation of FSUIPC.FSUIPCConfigItem instead
-		public SourceType   SourceType                  { get; set; }
-		public FsuipcOffset FSUIPC                      { get; set; }
-		public SimConnectValue SimConnectValue              { get; set; }
-		public MobiFlightVariable MobiFlightVariable          { get; set; }
-		public Transformation Transform                   { get; set; }
-		public string Value                       { get; set; }	
+		public SourceType           SourceType                  { get; set; }
+		public FsuipcOffset         FSUIPC                      { get; set; }
+		public SimConnectValue      SimConnectValue             { get; set; }
+		public MobiFlightVariable   MobiFlightVariable          { get; set; }
+
+        public XplaneDataRef        XplaneDataRef               { get; set; }
+		public Transformation       Transform                   { get; set; }
+		public string               Value                       { get; set; }	
 		public OutputConfig.Comparison Comparison                  { get; set; }
-		public string       DisplayType                 { get; set; }
-		public string       DisplaySerial               { get; set; }
-		public OutputConfig.Pin Pin                         { get; set; }
-		public OutputConfig.LedModule LedModule                   { get; set; }
-		public OutputConfig.LcdDisplay LcdDisplay                  { get; set; }
-		public List<string> BcdPins                     { get; set; }
-        public OutputConfig.Servo Servo { get; set; }
+		public string               DisplayType                 { get; set; }
+		public string               DisplaySerial               { get; set; }
+		public OutputConfig.Pin     Pin                         { get; set; }
+		public OutputConfig.LedModule   LedModule                   { get; set; }
+		public OutputConfig.LcdDisplay  LcdDisplay                  { get; set; }
+		public List<string>         BcdPins                     { get; set; }
+        public OutputConfig.Servo   Servo { get; set; }
         public OutputConfig.Stepper Stepper { get; set; }
-        public Interpolation Interpolation              { get; set; }
-        public string       ShiftRegister               { get; set; }
-        public string       RegisterOutputPin           { get; set; }
+        public Interpolation        Interpolation              { get; set; }
+        public OutputConfig.ShiftRegister ShiftRegister               { get; set; }
         public string       DisplayTrigger              { get; set; }
         public PreconditionList   Preconditions       { get; set; }
-        public ConfigRefList      ConfigRefs          { get; set; }        
+        public ConfigRefList      ConfigRefs          { get; set; }     
+        
+        public InputConfig.ButtonInputConfig ButtonInputConfig { get; set; }
+
+        public InputConfig.AnalogInputConfig AnalogInputConfig { get; set; }
 
         public OutputConfigItem()
         {
-            SourceType = SourceType.FSUIPC;
+            SourceType = SourceType.SIMCONNECT;
             FSUIPC = new FsuipcOffset();
             SimConnectValue = new SimConnectValue();
             MobiFlightVariable = new MobiFlightVariable();
+            XplaneDataRef = new XplaneDataRef();
             Transform = new Transformation();
             Comparison = new OutputConfig.Comparison();
             Pin = new OutputConfig.Pin();
@@ -57,18 +65,23 @@ namespace MobiFlight
             Servo = new OutputConfig.Servo();
             Stepper = new OutputConfig.Stepper() { CompassMode = false };
             BcdPins = new List<string>() { "A01", "A02", "A03", "A04", "A05" };
+            ShiftRegister = new OutputConfig.ShiftRegister();
             Interpolation = new Interpolation();
             Preconditions = new PreconditionList();
             ConfigRefs = new ConfigRefList();
+            ButtonInputConfig = null;
+            AnalogInputConfig = null;
         }
 
         public override bool Equals(object obj)
         { 
             return (
                 obj != null && obj is OutputConfigItem &&
+                this.DisplaySerial == (obj as OutputConfigItem).DisplaySerial &&
                 this.SourceType == (obj as OutputConfigItem).SourceType &&
                 this.FSUIPC.Equals((obj as OutputConfigItem).FSUIPC) &&
                 this.SimConnectValue.Equals((obj as OutputConfigItem).SimConnectValue) &&
+                this.XplaneDataRef.Equals((obj as OutputConfigItem).XplaneDataRef) &&
                 this.MobiFlightVariable.Equals((obj as OutputConfigItem).MobiFlightVariable) &&
                 this.Transform.Equals((obj as OutputConfigItem).Transform) &&
                 //===
@@ -80,15 +93,25 @@ namespace MobiFlight
                 this.LcdDisplay.Equals((obj as OutputConfigItem).LcdDisplay) &&
                 //===
                 this.Stepper.Equals((obj as OutputConfigItem).Stepper) &&
+                //==
+                this.Servo.Equals((obj as OutputConfigItem).Servo) &&
                 //===
                 // TODO: I will ignore this, because it is a deprecated feature
                 // this.BcdPins.Equals((obj as OutputConfigItem).BcdPins) &&
+                //===
+                this.ShiftRegister.Equals((obj as OutputConfigItem).ShiftRegister) &&
                 //===
                 this.Interpolation.Equals((obj as OutputConfigItem).Interpolation) &&
                 //===
                 this.Preconditions.Equals((obj as OutputConfigItem).Preconditions) &&
                 //===
-                this.ConfigRefs.Equals((obj as OutputConfigItem).ConfigRefs)
+                this.ConfigRefs.Equals((obj as OutputConfigItem).ConfigRefs) &&
+                //===
+                ((this.ButtonInputConfig == null && (obj as OutputConfigItem).ButtonInputConfig == null) || (
+                this.ButtonInputConfig != null && this.ButtonInputConfig.Equals((obj as OutputConfigItem).ButtonInputConfig))) &&
+                //===
+                ((this.AnalogInputConfig==null&&(obj as OutputConfigItem).AnalogInputConfig == null) || (
+                this.AnalogInputConfig != null && this.AnalogInputConfig.Equals((obj as OutputConfigItem).AnalogInputConfig)))
             );
         }
 
@@ -109,6 +132,10 @@ namespace MobiFlight
                 {
                     SourceType = SourceType.VARIABLE;
                     this.MobiFlightVariable.ReadXml(reader);
+                } else if (reader["type"] == "XplaneDataRef")
+                {
+                    SourceType = SourceType.XPLANE;
+                    this.XplaneDataRef.ReadXml(reader);
                 }
                 else
                 {
@@ -147,11 +174,12 @@ namespace MobiFlight
                 {
                     Pin.ReadXml(reader);
                 }
-                else if (DisplayType == MobiFlightLedModule.TYPE) {
-
+                else if (DisplayType == MobiFlightLedModule.TYPE)
+                {
                     LedModule.XmlRead(reader);
                 }
-                else if (DisplayType == ArcazeBcd4056.TYPE) { 
+                else if (DisplayType == ArcazeBcd4056.TYPE)
+                {
                     // ignore empty values
                     if (reader["bcdPins"] != null && reader["bcdPins"] != "")
                     {
@@ -165,27 +193,51 @@ namespace MobiFlight
                 else if (DisplayType == MobiFlightStepper.TYPE)
                 {
                     Stepper.ReadXml(reader);
-                }              
+                }
                 else if (DisplayType == OutputConfig.LcdDisplay.Type)
                 {
                     if (LcdDisplay == null) LcdDisplay = new OutputConfig.LcdDisplay();
                     LcdDisplay.ReadXml(reader);
-                    
-                    // don't read to the end tag all the way
-                    reader.Read();
                 }
                 else if (DisplayType == MobiFlightShiftRegister.TYPE)
                 {
-                    if (reader["registerOutputPin"] != null && reader["registerOutputPin"] != "")
-                    {
-                        RegisterOutputPin = reader["registerOutputPin"];
-                    }
-
-                    if (reader["shiftRegister"] != null && reader["shiftRegister"] != "")
-                    {
-                        ShiftRegister = reader["shiftRegister"];
-                    }
+                    ShiftRegister.ReadXml(reader);
                 }
+                else if (DisplayType == "InputAction")
+                {
+                    reader.Read();
+
+                    if (reader.Name == "button")
+                    {
+                        ButtonInputConfig = new ButtonInputConfig();
+                        ButtonInputConfig.ReadXml(reader);
+                    }
+                    else if (reader.Name == "analog")
+                    {
+                        AnalogInputConfig = new AnalogInputConfig();
+                        AnalogInputConfig.ReadXml(reader);
+                    }
+
+                    // read to the end of the InputAction
+                    reader.Read();
+                }
+
+                // Actually interpolation is in he wrong spot. :(
+                // it should not be nested
+                // it should be outside of the display node
+                if (reader.LocalName == "interpolation")
+                {
+                    Interpolation.ReadXml(reader);
+                    if (reader.LocalName == "display")
+                        reader.ReadEndElement(); // this closes the display node
+                }
+
+                if (reader.LocalName == "display" && reader.NodeType == XmlNodeType.Element)
+                    reader.Read();
+
+                // forward
+                if (reader.LocalName == "display" && reader.NodeType == XmlNodeType.EndElement)
+                    reader.ReadEndElement();
             }
 
             // Actually interpolation is in he wrong spot. :(
@@ -194,22 +246,9 @@ namespace MobiFlight
             if (reader.LocalName == "interpolation")
             {
                 Interpolation.ReadXml(reader);
-                if (reader.LocalName == "display")
-                    reader.ReadEndElement(); // this closes the display node
-            }
-
-            // forward
-            if (reader.LocalName == "display")
-                reader.ReadStartElement();
-
-            // Actually interpolation is in he wrong spot. :(
-            // it should not be nested
-            // it should be outside of the display node
-            if (reader.LocalName == "interpolation")
-            {
-                Interpolation.ReadXml(reader);
-                if (reader.LocalName != "preconditions")
-                    reader.ReadEndElement(); // this closes the display node
+                
+                if (reader.LocalName == "display" && reader.NodeType == XmlNodeType.EndElement)
+                    reader.Read(); // this closes the display node
             }
 
             // read precondition settings if present
@@ -236,26 +275,24 @@ namespace MobiFlight
                         ConfigRef tmp = new ConfigRef();
                         tmp.ReadXml(reader);
                         ConfigRefs.Add(tmp);
-                        reader.ReadStartElement();
                     } while (reader.LocalName == "configref");
-
-                    // read to the end of configref-node
-                    reader.ReadEndElement();
-                }
-                else
-                {
-                    reader.ReadStartElement();
                 }
             }
+
+            // read to the end of preconditions-node
+            if (reader.LocalName == "configrefs" && reader.NodeType == XmlNodeType.EndElement)
+                reader.ReadEndElement();
         }
 
         public virtual void WriteXml(XmlWriter writer)
         {
             writer.WriteStartElement("source");
-                if(SourceType==SourceType.FSUIPC)
+                if (SourceType == SourceType.FSUIPC)
                     this.FSUIPC.WriteXml(writer);
                 else if (SourceType == SourceType.VARIABLE)
                     this.MobiFlightVariable.WriteXml(writer);
+                else if (SourceType == SourceType.XPLANE)
+                    this.XplaneDataRef.WriteXml(writer);
                 else
                     this.SimConnectValue.WriteXml(writer);
             writer.WriteEndElement();
@@ -270,37 +307,51 @@ namespace MobiFlight
                 if ( DisplayTrigger != null)
                     writer.WriteAttributeString("trigger", DisplayTrigger);
 
-                if (DisplayType == ArcazeLedDigit.TYPE)
+            if (DisplayType == ArcazeLedDigit.TYPE)
+            {
+                LedModule.WriteXml(writer);
+
+            }
+            else if (DisplayType == ArcazeBcd4056.TYPE)
+            {
+                writer.WriteAttributeString("bcdPins", String.Join(",", BcdPins));
+            }
+            else if (DisplayType == DeviceType.Servo.ToString("F"))
+            {
+                Servo.WriteXml(writer);
+            }
+            else if (DisplayType == DeviceType.Stepper.ToString("F"))
+            {
+                Stepper.WriteXml(writer);
+            }
+            else if (DisplayType == OutputConfig.LcdDisplay.Type)
+            {
+                if (LcdDisplay == null) LcdDisplay = new OutputConfig.LcdDisplay();
+                LcdDisplay.WriteXml(writer);
+            }
+            else if (DisplayType == MobiFlightShiftRegister.TYPE)
+            {
+                ShiftRegister.WriteXml(writer);
+            }
+            else if (DisplayType == "InputAction")
+            {
+                if (ButtonInputConfig != null)
                 {
-                    LedModule.WriteXml(writer);
-                    
+                    writer.WriteStartElement("button");
+                    ButtonInputConfig.WriteXml(writer);
+                    writer.WriteEndElement();
                 }
-                else if (DisplayType == ArcazeBcd4056.TYPE)
+                else if (AnalogInputConfig != null)
                 {
-                    writer.WriteAttributeString("bcdPins", String.Join(",",BcdPins));
+                    writer.WriteStartElement("analog");
+                    AnalogInputConfig.WriteXml(writer);
+                    writer.WriteEndElement();
                 }
-                else if (DisplayType == DeviceType.Servo.ToString("F"))
-                {
-                    Servo.WriteXml(writer);
-                }
-                else if (DisplayType == DeviceType.Stepper.ToString("F"))
-                {
-                    Stepper.WriteXml(writer);
-                }
-                else if (DisplayType == OutputConfig.LcdDisplay.Type)
-                {
-                    if (LcdDisplay == null) LcdDisplay = new OutputConfig.LcdDisplay();
-                    LcdDisplay.WriteXml(writer);
-                }
-                else if (DisplayType == MobiFlightShiftRegister.TYPE)
-                {
-                    writer.WriteAttributeString("shiftRegister", ShiftRegister);
-                    writer.WriteAttributeString("registerOutputPin", RegisterOutputPin);
-                }
-                else
-                {
-                    Pin.WriteXml(writer);
-                }
+            }
+            else
+            {
+                Pin.WriteXml(writer);
+            }
                                 
             writer.WriteEndElement(); // end of display
 
@@ -325,6 +376,7 @@ namespace MobiFlight
             clone.FSUIPC                    = this.FSUIPC.Clone() as FsuipcOffset;
             clone.SimConnectValue           = this.SimConnectValue.Clone() as SimConnectValue;
             clone.MobiFlightVariable        = this.MobiFlightVariable.Clone() as MobiFlightVariable;
+            clone.XplaneDataRef             = this.XplaneDataRef.Clone() as XplaneDataRef;
 
 
             clone.Transform                 = this.Transform.Clone() as Transformation;
@@ -343,15 +395,15 @@ namespace MobiFlight
             clone.Servo                     = Servo.Clone() as OutputConfig.Servo;
             clone.Stepper                   = Stepper.Clone() as OutputConfig.Stepper;
 
-            clone.ShiftRegister             = this.ShiftRegister;
-            clone.RegisterOutputPin         = this.RegisterOutputPin;
+            clone.ShiftRegister             = ShiftRegister.Clone() as OutputConfig.ShiftRegister;
 
             clone.LcdDisplay                = this.LcdDisplay.Clone() as OutputConfig.LcdDisplay;
             clone.Preconditions             = Preconditions.Clone() as PreconditionList;
 
             clone.Interpolation             = this.Interpolation.Clone() as Interpolation;
             clone.ConfigRefs                = ConfigRefs.Clone() as ConfigRefList;
-
+            clone.ButtonInputConfig         = this.ButtonInputConfig?.Clone() as InputConfig.ButtonInputConfig;
+            clone.AnalogInputConfig         = this.AnalogInputConfig?.Clone() as InputConfig.AnalogInputConfig;
             return clone;
         }
     }
@@ -360,6 +412,7 @@ namespace MobiFlight
     {
         FSUIPC,
         SIMCONNECT,
-        VARIABLE
+        VARIABLE,
+        XPLANE
     }
 }

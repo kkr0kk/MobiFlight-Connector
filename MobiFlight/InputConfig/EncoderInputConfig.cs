@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Xml;
 using System.Xml.Serialization;
 
 namespace MobiFlight.InputConfig 
@@ -33,215 +34,81 @@ namespace MobiFlight.InputConfig
             reader.Read(); // this should be the opening tag "onLeft"
             if (reader.LocalName == "onLeft")
             {
-                switch (reader["type"])
-                {
-                    case FsuipcOffsetInputAction.TYPE:
-                        onLeft = new FsuipcOffsetInputAction();
-                        onLeft.ReadXml(reader);
-                        break;
-
-                    case KeyInputAction.TYPE:
-                        onLeft = new KeyInputAction();
-                        onLeft.ReadXml(reader);
-                        break;
-
-                    case EventIdInputAction.TYPE:
-                        onLeft = new EventIdInputAction();
-                        onLeft.ReadXml(reader);
-                        break;
-
-                    case PmdgEventIdInputAction.TYPE:
-                        onLeft = new PmdgEventIdInputAction();
-                        onLeft.ReadXml(reader);
-                        break;
-
-                    case JeehellInputAction.TYPE:
-                        onLeft = new JeehellInputAction();
-                        onLeft.ReadXml(reader);
-                        break;
-
-                    case LuaMacroInputAction.TYPE:
-                        onLeft = new LuaMacroInputAction();
-                        onLeft.ReadXml(reader);
-                        break;
-
-                    case MSFS2020EventIdInputAction.TYPE:
-                        onLeft = new MSFS2020EventIdInputAction();
-                        onLeft.ReadXml(reader);
-                        break;
-
-                    case VariableInputAction.TYPE:
-                        onLeft = new VariableInputAction();
-                        onLeft.ReadXml(reader);
-                        break;
-
-                    case MSFS2020CustomInputAction.TYPE:
-                        onLeft = new MSFS2020CustomInputAction();
-                        onLeft.ReadXml(reader);
-                        break;
-                }
-
+                onLeft = InputActionFactory.CreateByType(reader["type"]);
+                onLeft?.ReadXml(reader);
                 reader.Read(); // advance to the next
             }
 
             if (reader.LocalName == "onLeftFast")
             {
-                switch (reader["type"])
-                {
-                    case FsuipcOffsetInputAction.TYPE:
-                        onLeftFast = new FsuipcOffsetInputAction();
-                        onLeftFast.ReadXml(reader);
-                        break;
-
-                    case KeyInputAction.TYPE:
-                        onLeftFast = new KeyInputAction();
-                        onLeftFast.ReadXml(reader);
-                        break;
-
-                    case EventIdInputAction.TYPE:
-                        onLeftFast = new EventIdInputAction();
-                        onLeftFast.ReadXml(reader);
-                        break;
-
-                    case PmdgEventIdInputAction.TYPE:
-                        onLeftFast = new PmdgEventIdInputAction();
-                        onLeftFast.ReadXml(reader);
-                        break;
-
-                    case JeehellInputAction.TYPE:
-                        onLeftFast = new JeehellInputAction();
-                        onLeftFast.ReadXml(reader);
-                        break;
-
-                    case LuaMacroInputAction.TYPE:
-                        onLeftFast = new LuaMacroInputAction();
-                        onLeftFast.ReadXml(reader);
-                        break;
-
-                    case MSFS2020EventIdInputAction.TYPE:
-                        onLeftFast = new MSFS2020EventIdInputAction();
-                        onLeftFast.ReadXml(reader);
-                        break;
-
-                    case VariableInputAction.TYPE:
-                        onLeftFast = new VariableInputAction();
-                        onLeftFast.ReadXml(reader);
-                        break;
-
-                    case MSFS2020CustomInputAction.TYPE:
-                        onLeftFast = new MSFS2020CustomInputAction();
-                        onLeftFast.ReadXml(reader);
-                        break;
-                }
-
+                onLeftFast = InputActionFactory.CreateByType(reader["type"]);
+                onLeftFast?.ReadXml(reader);
                 reader.Read(); // advance to the next
             }
 
             if (reader.LocalName == "onRight")
             {
-                switch (reader["type"])
-                {
-                    case FsuipcOffsetInputAction.TYPE:
-                        onRight = new FsuipcOffsetInputAction();
-                        onRight.ReadXml(reader);
-                        break;
-
-                    case KeyInputAction.TYPE:
-                        onRight = new KeyInputAction();
-                        onRight.ReadXml(reader);
-                        break;
-
-                    case EventIdInputAction.TYPE:
-                        onRight = new EventIdInputAction();
-                        onRight.ReadXml(reader);
-                        break;
-
-                    case PmdgEventIdInputAction.TYPE:
-                        onRight = new PmdgEventIdInputAction();
-                        onRight.ReadXml(reader);
-                        break;
-
-                    case JeehellInputAction.TYPE:
-                        onRight = new JeehellInputAction();
-                        onRight.ReadXml(reader);
-                        break;
-
-                    case LuaMacroInputAction.TYPE:
-                        onRight = new LuaMacroInputAction();
-                        onRight.ReadXml(reader);
-                        break;
-
-                    case MSFS2020EventIdInputAction.TYPE:
-                        onRight = new MSFS2020EventIdInputAction();
-                        onRight.ReadXml(reader);
-                        break;
-
-                    case VariableInputAction.TYPE:
-                        onRight = new VariableInputAction();
-                        onRight.ReadXml(reader);
-                        break;
-
-                    case MSFS2020CustomInputAction.TYPE:
-                        onRight = new MSFS2020CustomInputAction();
-                        onRight.ReadXml(reader);
-                        break;
-                }
-
+                onRight = InputActionFactory.CreateByType(reader["type"]);
+                onRight?.ReadXml(reader);
                 reader.Read(); // advance to the next
             }
 
             if (reader.LocalName == "onRightFast")
             {
-                switch (reader["type"])
-                {
-                    case FsuipcOffsetInputAction.TYPE:
-                        onRightFast = new FsuipcOffsetInputAction();
-                        onRightFast.ReadXml(reader);
-                        break;
-
-                    case KeyInputAction.TYPE:
-                        onRightFast = new KeyInputAction();
-                        onRightFast.ReadXml(reader);
-                        break;
-
-                    case EventIdInputAction.TYPE:
-                        onRightFast = new EventIdInputAction();
-                        onRightFast.ReadXml(reader);
-                        break;
-
-                    case PmdgEventIdInputAction.TYPE:
-                        onRightFast = new PmdgEventIdInputAction();
-                        onRightFast.ReadXml(reader);
-                        break;
-
-                    case JeehellInputAction.TYPE:
-                        onRightFast = new JeehellInputAction();
-                        onRightFast.ReadXml(reader);
-                        break;
-
-                    case LuaMacroInputAction.TYPE:
-                        onRightFast = new LuaMacroInputAction();
-                        onRightFast.ReadXml(reader);
-                        break;
-
-                    case MSFS2020EventIdInputAction.TYPE:
-                        onRightFast = new MSFS2020EventIdInputAction();
-                        onRightFast.ReadXml(reader);
-                        break;
-
-                    case VariableInputAction.TYPE:
-                        onRightFast = new VariableInputAction();
-                        onRightFast.ReadXml(reader);
-                        break;
-
-                    case MSFS2020CustomInputAction.TYPE:
-                        onRightFast = new MSFS2020CustomInputAction();
-                        onRightFast.ReadXml(reader);
-                        break;
-                }
-
+                onRightFast = InputActionFactory.CreateByType(reader["type"]);
+                onRightFast?.ReadXml(reader);
                 reader.Read(); // advance to the next
             }
+
+            if (reader.NodeType == XmlNodeType.EndElement) 
+                reader.Read(); // this should be the corresponding "end" node            
+        }
+
+        public List<InputAction> GetInputActionsByType(Type type)
+        {
+            List<InputAction> result = new List<InputAction>();
+            if (onRight != null && onRight.GetType() == type)
+                result.Add(onRight);
+            if (onRightFast != null && onRightFast.GetType() == type)
+                result.Add(onRightFast);
+            if (onLeft != null && onLeft.GetType() == type)
+                result.Add(onLeft);
+            if (onLeftFast != null && onLeftFast.GetType() == type)
+                result.Add(onLeftFast);
+            return result;
+        }
+
+        public Dictionary<String, int> GetStatistics()
+        {
+            Dictionary<String, int> result = new Dictionary<string, int>();
+
+            result["Input.Encoder"] = 1;
+
+            if (onLeft != null)
+            {
+                result["Input.OnLeft"] = 1;
+                result["Input." + onLeft.GetType().Name] = 1;
+            }
+
+            if (onLeftFast != null)
+            {
+                result["Input.OnLeftFast"] = 1;
+                result["Input." + onLeftFast.GetType().Name] = 1;
+            }
+
+            if (onRight != null)
+            {
+                result["Input.OnRight"] = 1;
+                result["Input." + onRight.GetType().Name] = 1;
+            }
+
+            if (onRightFast != null)
+            {
+                result["Input.OnRightFast"] = 1;
+                result["Input." + onRightFast.GetType().Name] = 1;
+            }
+
+            return result;
         }
 
         public void WriteXml(System.Xml.XmlWriter writer)
@@ -263,27 +130,27 @@ namespace MobiFlight.InputConfig
             writer.WriteEndElement();
         }
 
-        internal void execute(FSUIPC.Fsuipc2Cache fsuipcCache, SimConnectMSFS.SimConnectCache simConnectCache, MobiFlightCache moduleCache, InputEventArgs args, List<ConfigRefValue> configRefs)
+        internal void execute(CacheCollection cacheCollection, InputEventArgs args, List<ConfigRefValue> configRefs)
         {
-            if ((args.Value == 0 && onLeft != null) || (args.Value == 1 && onLeftFast == null))
+            if ((args.Value == 0 && onLeft != null) || (args.Value == 1 && onLeftFast == null && onLeft != null))
             {
                 Log.Instance.log("Executing OnLeft: " + args.DeviceId + "@" + args.Serial, LogSeverity.Debug);
-                onLeft.execute(fsuipcCache, simConnectCache, moduleCache, args, configRefs);
+                onLeft.execute(cacheCollection, args, configRefs);
             }
             else if (args.Value == 1 && onLeftFast != null)
             {
                 Log.Instance.log("Executing OnLeftFast: " + args.DeviceId + "@" + args.Serial, LogSeverity.Debug);
-                onLeftFast.execute(fsuipcCache, simConnectCache, moduleCache, args, configRefs);
+                onLeftFast.execute(cacheCollection, args, configRefs);
             }
-            else if ((args.Value == 2 && onRight != null) || (args.Value == 3 && onRightFast == null))
+            else if ((args.Value == 2 && onRight != null) || (args.Value == 3 && onRightFast == null && onRight != null))
             {
                 Log.Instance.log("Executing OnRight: " + args.DeviceId + "@" + args.Serial, LogSeverity.Debug);
-                onRight.execute(fsuipcCache, simConnectCache, moduleCache, args, configRefs);
+                onRight.execute(cacheCollection, args, configRefs);
             }
             else if (args.Value == 3 && onRightFast != null)
             {
                 Log.Instance.log("Executing OnRightFast: " + args.DeviceId + "@" + args.Serial, LogSeverity.Debug);
-                onRightFast.execute(fsuipcCache, simConnectCache, moduleCache, args, configRefs);
+                onRightFast.execute(cacheCollection, args, configRefs);
             }
 
         }

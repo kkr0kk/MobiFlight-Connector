@@ -19,7 +19,7 @@ namespace MobiFlight.ProjectMessages {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class ProjectMessages {
@@ -533,7 +533,7 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to An error occured on parsing your value formula. Please review and correct any errors..
+        ///   Looks up a localized string similar to An error occurred on parsing your value formula. Please review and correct any errors..
         /// </summary>
         internal static string uiMessageErrorOnParsingExpression {
             get {
@@ -552,7 +552,20 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to There was an error on uploading the firmware!\nEnable Debug Logging for more details..
+        ///   Looks up a localized string similar to Updating {0} on {1} (Module {2}/{3}).
+        /// </summary>
+        internal static string uiMessageFirmwareUpdateStatus {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareUpdateStatus", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to There was an error on uploading the firmware for the board(s):
+        ///
+        ///{0}
+        ///
+        ///Check log for more details..
         /// </summary>
         internal static string uiMessageFirmwareUploadError {
             get {
@@ -566,6 +579,15 @@ namespace MobiFlight.ProjectMessages {
         internal static string uiMessageFirmwareUploadSuccessful {
             get {
                 return ResourceManager.GetString("uiMessageFirmwareUploadSuccessful", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Firmware Update.
+        /// </summary>
+        internal static string uiMessageFirmwareUploadTitle {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareUploadTitle", resourceCulture);
             }
         }
         
@@ -716,6 +738,24 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to You already can reference all available configs. Adding more doesn&apos;t make sense..
+        /// </summary>
+        internal static string uiMessageNoMoreConfigReferenceAvailable {
+            get {
+                return ResourceManager.GetString("uiMessageNoMoreConfigReferenceAvailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to There are no missing joysticks found..
+        /// </summary>
+        internal static string uiMessageNoNotConnectedJoysticksInConfigFound {
+            get {
+                return ResourceManager.GetString("uiMessageNoNotConnectedJoysticksInConfigFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to There are no orphaned serials in the current config..
         /// </summary>
         internal static string uiMessageNoOrphanedSerialsFound {
@@ -730,6 +770,19 @@ namespace MobiFlight.ProjectMessages {
         internal static string uiMessageNoSimConnectConnection {
             get {
                 return ResourceManager.GetString("uiMessageNoSimConnectConnection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The following joysticks are currently not connected but referenced in the config:
+        ///
+        ///{0}
+        ///
+        ///Respective input actions won&apos;t work until they are connected and you have restarted MobiFlight..
+        /// </summary>
+        internal static string uiMessageNotConnectedJoysticksInConfigFound {
+            get {
+                return ResourceManager.GetString("uiMessageNotConnectedJoysticksInConfigFound", resourceCulture);
             }
         }
         
@@ -851,6 +904,24 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to {0} matches found..
+        /// </summary>
+        internal static string uiMessagesSimConnectPanelMatchesFound {
+            get {
+                return ResourceManager.GetString("uiMessagesSimConnectPanelMatchesFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to - show all -.
+        /// </summary>
+        internal static string uiMessagesSimConnectPanelShowAll {
+            get {
+                return ResourceManager.GetString("uiMessagesSimConnectPanelShowAll", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Error during Test-Mode: Module not connected..
         /// </summary>
         internal static string uiMessageTestModeModuleNotConnected {
@@ -879,7 +950,9 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to There are Arduinos connected to your PC - do you want to upload the MobiFlight Firmware to them?.
+        ///   Looks up a localized string similar to Arduino boards found that are compatible with MobiFlight. To be able to use them they require the latest MobiFlight Firmware.
+        ///
+        ///Upload the MobiFlight Firmware now!.
         /// </summary>
         internal static string uiMessageUpdateArduinoOkCancel {
             get {
@@ -888,11 +961,29 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Some Mobiflight Boards have an old firmware - update them now.
+        ///   Looks up a localized string similar to Compatible boards found!.
+        /// </summary>
+        internal static string uiMessageUpdateArduinoTitle {
+            get {
+                return ResourceManager.GetString("uiMessageUpdateArduinoTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Some Mobiflight Boards have an old firmware - update them now?.
         /// </summary>
         internal static string uiMessageUpdateOldFirmwareOkCancel {
             get {
                 return ResourceManager.GetString("uiMessageUpdateOldFirmwareOkCancel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to New Firmware Available!.
+        /// </summary>
+        internal static string uiMessageUpdateOldFirmwareTitle {
+            get {
+                return ResourceManager.GetString("uiMessageUpdateOldFirmwareTitle", resourceCulture);
             }
         }
         
@@ -1032,20 +1123,11 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Choose a Preset.
+        ///   Looks up a localized string similar to This change will require a restart of MobiFlight to become effective..
         /// </summary>
-        internal static string uiSimConnectPanelComboBoxPresetSelect {
+        internal static string uiSettingsMobiFlightChangeRequiresRestart {
             get {
-                return ResourceManager.GetString("uiSimConnectPanelComboBoxPresetSelect", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Choose a Preset Group....
-        /// </summary>
-        internal static string uiSimConnectPanelComboBoxPresetSelectGroup {
-            get {
-                return ResourceManager.GetString("uiSimConnectPanelComboBoxPresetSelectGroup", resourceCulture);
+                return ResourceManager.GetString("uiSettingsMobiFlightChangeRequiresRestart", resourceCulture);
             }
         }
         

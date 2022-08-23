@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -13,12 +14,25 @@ namespace MobiFlight.SimConnectMSFS
     {
         public const String WasmModuleFolder = @".\MSFS2020-module\mobiflight-event-module";
         
-        public const String WasmEventsTxtUrl = @"https://raw.githubusercontent.com/Mobiflight/MobiFlight-Connector/main/MSFS2020-module/mobiflight-event-module/modules/events.txt";    
-        public const String WasmEventsCipUrl = @"https://raw.githubusercontent.com/Mobiflight/MobiFlight-Connector/main/Presets/msfs2020_eventids.cip";
-        public const String WasmEventsTxtFolder = @"\mobiflight-event-module\modules";
+        public const String WasmEventsTxtUrl = @"https://hubhop-api-mgtm.azure-api.net/api/v1/export/presets?type=wasm";
+        public const String WasmEventsTxtFolder = @"mobiflight-event-module\modules";
         public const String WasmEventsTxtFile = "events.txt";
+
+        public const String WasmEventsCipUrl = @"https://hubhop-api-mgtm.azure-api.net/api/v1/export/presets?type=cip";
         public const String WasmEventsCipFolder = @".\presets";
-        
+        public const String WasmEventsCipFileName = @"msfs2020_eventids.cip";
+
+        public const String WasmEventsSimVarsUrl = @"https://hubhop-api-mgtm.azure-api.net/api/v1/export/presets?type=simVars";
+        public const String WasmEventsSimVarsFolder = @".\presets";
+        public const String WasmEventsSimVarsFileName = @"msfs2020_simvars.cip";
+
+        public const String WasmEventHubHHopUrl = @"https://hubhop-api-mgtm.azure-api.net/api/v1/presets?type=json";
+        public const String WasmEventsHubHopFolder = @".\presets";
+        public const String WasmEventsHubHopFileName = @"msfs2020_hubhop_presets.json";
+
+        public const String WasmModuleName = @"MobiFlightWasmModule.wasm";
+        public const String WasmModuleNameOld = @"StandaloneModule.wasm";
+
         public String CommunityFolder { get; set; }
 
         private String ExtractCommunityFolderFromUserCfg(String UserCfg)
@@ -85,8 +99,18 @@ namespace MobiFlight.SimConnectMSFS
             String destFolder = CommunityFolder + @"\mobiflight-event-module";
             CopyFolder(new DirectoryInfo(WasmModuleFolder), new DirectoryInfo(destFolder));
 
+            // Remove the old Wasm File
+            DeleteOldWasmFile();
+
             Log.Instance.log("WASM module has been installed successfully.", LogSeverity.Info);
             return true;
+        }
+
+        private void DeleteOldWasmFile()
+        {
+            String installedWASM = CommunityFolder + $@"\mobiflight-event-module\modules\{WasmModuleNameOld}";
+            if(System.IO.File.Exists(installedWASM))
+                System.IO.File.Delete(installedWASM);
         }
 
         public static void CopyFolder(DirectoryInfo source, DirectoryInfo target)
@@ -131,75 +155,105 @@ namespace MobiFlight.SimConnectMSFS
             if (CommunityFolder == null) return true;
 
 
-            if (!File.Exists(CommunityFolder + @"\mobiflight-event-module\modules\StandaloneModule.wasm"))
+            if (!File.Exists(CommunityFolder + $@"\mobiflight-event-module\modules\{WasmModuleName}"))
                 return true;
 
-            installedWASM = CalculateMD5(CommunityFolder + @"\mobiflight-event-module\modules\StandaloneModule.wasm");
-            mobiflightWASM = CalculateMD5(@".\MSFS2020-module\mobiflight-event-module\modules\StandaloneModule.wasm");
+            installedWASM = CalculateMD5(CommunityFolder + $@"\mobiflight-event-module\modules\{WasmModuleName}");
+            mobiflightWASM = CalculateMD5($@".\MSFS2020-module\mobiflight-event-module\modules\{WasmModuleName}");
 
-            installedEvents = CalculateMD5(CommunityFolder + @"\mobiflight-event-module\modules\events.txt");
-            mobiflightEvents = CalculateMD5(@".\MSFS2020-module\mobiflight-event-module\modules\events.txt");
+            installedEvents = CalculateMD5(CommunityFolder + $@"\mobiflight-event-module\modules\{WasmEventsTxtFile}");
+            mobiflightEvents = CalculateMD5($@".\MSFS2020-module\mobiflight-event-module\modules\{WasmEventsTxtFile}");
 
             return (installedWASM != mobiflightWASM || installedEvents != mobiflightEvents);
         }
 
         public bool InstallWasmEvents()
         {
-            if (!Directory.Exists(WasmModuleFolder))
+            String destFolder = Path.Combine(CommunityFolder, WasmEventsTxtFolder);
+
+            try
             {
-                Log.Instance.log("WASM events cannot be installed. WASM Module Folder not found. " + WasmModuleFolder, LogSeverity.Error);
+
+                if (!Directory.Exists(destFolder))
+                {
+                    Log.Instance.log("WASM events cannot be installed. WASM module folder not found. " + destFolder, LogSeverity.Error);
+                    return false;
+                }
+
+                if (!Directory.Exists(WasmModuleFolder))
+                {
+                    Log.Instance.log("WASM events cannot be installed. WASM module folder not found. " + WasmModuleFolder, LogSeverity.Error);
+                    return false;
+                }
+
+                if (!Directory.Exists(CommunityFolder))
+                {
+                    Log.Instance.log("WASM events cannot be installed. Community folder not found. " + CommunityFolder, LogSeverity.Error);
+                    return false;
+                }
+
+                if (!DownloadWasmEvents())
+                {
+                    Log.Instance.log("WASM events cannot be installed. Download was not successful. " + CommunityFolder, LogSeverity.Error);
+                    return false;
+                }
+
+                BackupAndInstallWasmEventsTxt(destFolder);
+            }
+            catch (Exception ex)
+            {
+                Log.Instance.log("WASM events cannot be installed. " + ex.Message, LogSeverity.Error);
                 return false;
             }
-
-            if (!Directory.Exists(CommunityFolder))
-            {
-                Log.Instance.log("WASM events cannot be installed. Community Folder not found. " + CommunityFolder, LogSeverity.Error);
-                return false;
-            }
-
-            if (!DownloadWasmEvents())
-            {
-                Log.Instance.log("WASM events cannot be installed. Download was not successful. " + CommunityFolder, LogSeverity.Error);
-                return false;
-            }
-
-            String sourcePath = WasmModuleFolder + @"\modules\" + WasmEventsTxtFile;
-            String destPath = CommunityFolder + WasmEventsTxtFolder + @"\" + WasmEventsTxtFile;
-            System.IO.File.Delete(destPath + ".bak");
-
-            if (System.IO.File.Exists(destPath))
-                System.IO.File.Move(destPath, destPath + ".bak");
-
-            System.IO.File.Copy(sourcePath, destPath);
 
             Log.Instance.log("WASM events have been installed successfully.", LogSeverity.Info);
             return true;
         }
 
+        private static void BackupAndInstallWasmEventsTxt(string destFolder)
+        {
+            // Copy wasm events.txt to community folder
+            // and create a backup file
+            String sourceFile = Path.Combine(WasmModuleFolder, "modules", WasmEventsTxtFile);
+            String destFile = Path.Combine(destFolder, WasmEventsTxtFile);
+
+            System.IO.File.Delete(destFile + ".bak");
+
+            if (System.IO.File.Exists(destFile))
+                System.IO.File.Move(destFile, destFile + ".bak");
+
+            System.IO.File.Copy(sourceFile, destFile);
+        }
+
         public bool DownloadWasmEvents()
         {
-            if(!DownloadSingleFile(new Uri(WasmEventsTxtUrl), WasmModuleFolder + @"\modules")) return false;
+            if(!DownloadSingleFile(new Uri(WasmEventsTxtUrl), WasmEventsTxtFile, WasmModuleFolder + @"\modules")) return false;
             Log.Instance.log("WASM events.txt has been downloaded and installed successfully.", LogSeverity.Info);
 
-            if (!DownloadSingleFile(new Uri(WasmEventsCipUrl), WasmEventsCipFolder)) return false;
+            if (!DownloadSingleFile(new Uri(WasmEventsCipUrl), WasmEventsCipFileName, WasmEventsCipFolder)) return false;
             Log.Instance.log("WASM msfs2020_eventids.cip has been downloaded and installed successfully.", LogSeverity.Info);
             
+            if (!DownloadSingleFile(new Uri(WasmEventsSimVarsUrl), WasmEventsSimVarsFileName, WasmEventsSimVarsFolder)) return false;
+            Log.Instance.log("WASM msfs2020_simvars.cip has been downloaded and installed successfully.", LogSeverity.Info);
+
+            if (!DownloadSingleFile(new Uri(WasmEventHubHHopUrl), WasmEventsHubHopFileName, WasmEventsHubHopFolder)) return false;
+            Log.Instance.log($"WASM {WasmEventsHubHopFileName} has been downloaded and installed successfully.", LogSeverity.Info);
             return true;
         }
 
-        private bool DownloadSingleFile(Uri uri, String targetPath)
+        private bool DownloadSingleFile(Uri uri, String filename, String targetPath)
         {
-            var filename = System.IO.Path.GetFileName(uri.LocalPath);
-
             SecurityProtocolType oldType = System.Net.ServicePointManager.SecurityProtocol;
 
             System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             WebClient webClient = new WebClient();
             string tmpFile = Directory.GetCurrentDirectory() + targetPath + @"\" + filename + ".tmp";
+
             webClient.DownloadFile(uri, tmpFile);
             webClient.Dispose();
-            System.IO.File.Delete(targetPath + @"\" + filename);
-            System.IO.File.Move(tmpFile, targetPath + @"\" + filename);
+
+            System.IO.File.Delete($@"{targetPath}\{filename}");
+            System.IO.File.Move(tmpFile, $@"{targetPath}\{filename}");
 
             System.Net.ServicePointManager.SecurityProtocol = oldType;
             return true;

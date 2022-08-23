@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MobiFlight;
+using MobiFlight.InputConfig;
 using MobiFlight.OutputConfig;
 using System;
 using System.Collections.Generic;
@@ -74,6 +75,57 @@ namespace MobiFlight.Tests
             Assert.IsNotNull(o.encoder.onRightFast, "encoder onRightFast is null");
             Assert.IsNotNull(o.ConfigRefs, "ConfigRefs is null");
             Assert.AreEqual(o.ConfigRefs.Count, 0, "ConfigRefs.Count is not 2");
+
+            o = new InputConfigItem();
+            s = System.IO.File.ReadAllText(@"assets\MobiFlight\InputConfig\InputConfigItem\ReadXmlTest.InputShiftRegister.xml");
+            sr = new StringReader(s);
+            settings = new XmlReaderSettings();
+            settings.IgnoreWhitespace = true;
+
+            xmlReader = System.Xml.XmlReader.Create(sr, settings);
+            xmlReader.ReadToDescendant("settings");
+            o.ReadXml(xmlReader);
+
+            Assert.AreEqual(o.ModuleSerial, "TestSerial", "ModuleSerial not the same");
+            Assert.AreEqual(o.Name, "TestName", "Name not the same");
+            Assert.AreEqual(o.Preconditions.Count, 0, "Preconditions Count not the same");
+            Assert.AreEqual(o.Type, "Button", "Type not the same");
+            Assert.IsNull(o.inputShiftRegister.onPress, "button onpress not null");
+            Assert.IsNotNull(o.inputShiftRegister.onRelease, "button onRelease is null");
+            Assert.IsNotNull(o.inputShiftRegister.onRelease as JeehellInputAction, "OnRelease is not of type JeehellInputAction");
+
+            o = new InputConfigItem();
+            s = System.IO.File.ReadAllText(@"assets\MobiFlight\InputConfig\InputConfigItem\ReadXmlTest.InputMultiplexer.xml");
+            sr = new StringReader(s);
+            settings = new XmlReaderSettings();
+            settings.IgnoreWhitespace = true;
+
+            xmlReader = System.Xml.XmlReader.Create(sr, settings);
+            xmlReader.ReadToDescendant("settings");
+            o.ReadXml(xmlReader);
+
+            Assert.AreEqual(o.ModuleSerial, "TestSerial", "ModuleSerial not the same");
+            Assert.AreEqual(o.Name, "TestName", "Name not the same");
+            Assert.AreEqual(o.Preconditions.Count, 0, "Preconditions Count not the same");
+            Assert.AreEqual(o.Type, "Button", "Type not the same");
+            Assert.IsNull(o.inputMultiplexer.onPress, "button onpress not null");
+            Assert.IsNotNull(o.inputMultiplexer.onRelease, "button onRelease is null");
+            Assert.IsNotNull(o.inputMultiplexer.onRelease as JeehellInputAction, "OnRelease is not of type JeehellInputAction");
+
+            o = new InputConfigItem();
+            s = System.IO.File.ReadAllText(@"assets\MobiFlight\InputConfig\InputConfigItem\ReadXmlTest.860.xml");
+            sr = new StringReader(s);
+            settings = new XmlReaderSettings();
+            settings.IgnoreWhitespace = true;
+
+            xmlReader = System.Xml.XmlReader.Create(sr, settings);
+            xmlReader.ReadToDescendant("settings");
+            o.ReadXml(xmlReader);
+
+            Assert.AreEqual(o.ModuleSerial, "737PEDESTAL1/ SN-769-a6a", "ModuleSerial not the same");
+            Assert.AreEqual(o.Name, "Analog 67 A13", "Name not the same");
+            Assert.AreEqual(o.Preconditions.Count, 1, "Preconditions Count not the same");
+            Assert.AreEqual(o.ConfigRefs.Count, 1, "Config ref count is not correct");
         }
 
         [TestMethod()]
@@ -96,6 +148,32 @@ namespace MobiFlight.Tests
             String result = System.IO.File.ReadAllText(@"assets\MobiFlight\InputConfig\InputConfigItem\WriteXmlTest.1.xml");
 
             Assert.AreEqual(s, result, "The both strings are not equal");
+
+            // https://github.com/MobiFlight/MobiFlight-Connector/issues/797
+            o = new InputConfigItem();
+            o.Type = InputConfigItem.TYPE_ANALOG;
+            if (o.analog == null) o.analog = new InputConfig.AnalogInputConfig();
+            o.analog.onChange = new MSFS2020CustomInputAction() { Command = "test", PresetId = Guid.NewGuid().ToString() };
+
+            sw = new StringWriter();
+            xmlWriter = System.Xml.XmlWriter.Create(sw, settings);
+            xmlWriter.WriteStartElement("settings");
+            o.WriteXml(xmlWriter);
+            xmlWriter.WriteEndElement();
+            xmlWriter.Flush();
+            s = sw.ToString();
+
+            StringReader sr = new StringReader(s);
+            XmlReaderSettings readerSettings = new XmlReaderSettings();
+            readerSettings.IgnoreWhitespace = true;
+
+            XmlReader xmlReader = System.Xml.XmlReader.Create(sr, readerSettings);
+            InputConfigItem o1 = new InputConfigItem();
+            xmlReader.ReadToDescendant("settings");
+            o1.ReadXml(xmlReader);
+
+            Assert.IsNotNull(o1.analog, "Is null");
+            Assert.AreEqual(o.analog.onChange is MSFS2020CustomInputAction, o1.analog.onChange is MSFS2020CustomInputAction, "Not of type MSFS2020CustomInputAction");
         }
 
         [TestMethod()]
@@ -152,6 +230,59 @@ namespace MobiFlight.Tests
             o2 = generateTestObject();
 
             Assert.IsTrue(o1.Equals(o2));
+        }
+
+        [TestMethod()]
+        public void GetStatisticsTest()
+        {
+            // https://github.com/MobiFlight/MobiFlight-Connector/issues/623
+            InputConfigItem o = new InputConfigItem();
+            String s = System.IO.File.ReadAllText(@"assets\MobiFlight\InputConfig\InputConfigItem\ReadXmlTest.623.xml");
+            StringReader sr = new StringReader(s);
+            XmlReaderSettings settings = new XmlReaderSettings();
+            settings.IgnoreWhitespace = true;
+
+            System.Xml.XmlReader xmlReader = System.Xml.XmlReader.Create(sr, settings);
+            xmlReader.ReadToDescendant("settings");
+            o.ReadXml(xmlReader);
+
+            var statistics = o.GetStatistics();
+            Assert.IsNotNull(statistics, "Statistics should be always an empty Dictionary<String, int>");
+            Assert.AreEqual(0, statistics.Count);
+
+            o.analog = new InputConfig.AnalogInputConfig();
+            o.analog.onChange = new InputConfig.MSFS2020CustomInputAction();
+            statistics = o.GetStatistics();
+            Assert.AreEqual(o.analog.GetStatistics().Count, statistics.Count);
+        }
+
+        [TestMethod()]
+        public void GetInputActionsByTypeTest()
+        {
+            InputConfigItem o = new InputConfigItem();
+            o.analog = new InputConfig.AnalogInputConfig();
+            o.analog.onChange = new VariableInputAction();
+
+            var result = o.GetInputActionsByType(typeof(VariableInputAction));
+            Assert.AreEqual(result.Count, 1);
+
+            o.encoder = new InputConfig.EncoderInputConfig();
+            o.encoder.onLeft = new VariableInputAction();
+
+            result = o.GetInputActionsByType(typeof(VariableInputAction));
+            Assert.AreEqual(result.Count, 2);
+
+            o.button = new InputConfig.ButtonInputConfig();
+            o.button.onPress = new VariableInputAction();
+
+            result = o.GetInputActionsByType(typeof(VariableInputAction));
+            Assert.AreEqual(result.Count, 3);
+
+            o.inputShiftRegister = new InputConfig.InputShiftRegisterConfig();
+            o.inputShiftRegister.onPress = new VariableInputAction();
+
+            result = o.GetInputActionsByType(typeof(VariableInputAction));
+            Assert.AreEqual(result.Count, 4);
         }
     }
 }

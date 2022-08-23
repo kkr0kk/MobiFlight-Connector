@@ -28,7 +28,10 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(ActionTypePanel));
             this.panel1 = new System.Windows.Forms.Panel();
+            this.PasteButton = new System.Windows.Forms.Button();
+            this.CopyButton = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
             this.ActionTypeComboBox = new System.Windows.Forms.ComboBox();
             this.panel1.SuspendLayout();
@@ -36,48 +39,50 @@
             // 
             // panel1
             // 
-            this.panel1.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            resources.ApplyResources(this.panel1, "panel1");
+            this.panel1.Controls.Add(this.PasteButton);
+            this.panel1.Controls.Add(this.CopyButton);
             this.panel1.Controls.Add(this.label2);
             this.panel1.Controls.Add(this.ActionTypeComboBox);
-            this.panel1.Dock = System.Windows.Forms.DockStyle.Top;
-            this.panel1.Location = new System.Drawing.Point(0, 0);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(339, 33);
-            this.panel1.TabIndex = 17;
+            // 
+            // PasteButton
+            // 
+            resources.ApplyResources(this.PasteButton, "PasteButton");
+            this.PasteButton.Name = "PasteButton";
+            this.PasteButton.UseVisualStyleBackColor = true;
+            this.PasteButton.Click += new System.EventHandler(this.PasteButton_Click);
+            // 
+            // CopyButton
+            // 
+            resources.ApplyResources(this.CopyButton, "CopyButton");
+            this.CopyButton.Name = "CopyButton";
+            this.CopyButton.UseVisualStyleBackColor = true;
+            this.CopyButton.Click += new System.EventHandler(this.CopyButton_Click);
             // 
             // label2
             // 
-            this.label2.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.label2.Location = new System.Drawing.Point(17, 6);
+            resources.ApplyResources(this.label2, "label2");
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(82, 13);
-            this.label2.TabIndex = 16;
-            this.label2.Text = "Action Type";
-            this.label2.TextAlign = System.Drawing.ContentAlignment.TopRight;
             // 
             // ActionTypeComboBox
             // 
             this.ActionTypeComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.ActionTypeComboBox.FormattingEnabled = true;
             this.ActionTypeComboBox.Items.AddRange(new object[] {
-            "none",
-            "FSUIPC Offset",
-            "FSUIPC Macro",
-            "Key"});
-            this.ActionTypeComboBox.Location = new System.Drawing.Point(105, 2);
-            this.ActionTypeComboBox.MaximumSize = new System.Drawing.Size(250, 0);
-            this.ActionTypeComboBox.MinimumSize = new System.Drawing.Size(47, 0);
+            resources.GetString("ActionTypeComboBox.Items"),
+            resources.GetString("ActionTypeComboBox.Items1"),
+            resources.GetString("ActionTypeComboBox.Items2"),
+            resources.GetString("ActionTypeComboBox.Items3")});
+            resources.ApplyResources(this.ActionTypeComboBox, "ActionTypeComboBox");
             this.ActionTypeComboBox.Name = "ActionTypeComboBox";
-            this.ActionTypeComboBox.Size = new System.Drawing.Size(196, 21);
-            this.ActionTypeComboBox.TabIndex = 17;
             // 
             // ActionTypePanel
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            resources.ApplyResources(this, "$this");
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.Controls.Add(this.panel1);
             this.Name = "ActionTypePanel";
-            this.Size = new System.Drawing.Size(339, 36);
             this.panel1.ResumeLayout(false);
             this.ResumeLayout(false);
 
@@ -88,5 +93,7 @@
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Label label2;
         public System.Windows.Forms.ComboBox ActionTypeComboBox;
+        private System.Windows.Forms.Button PasteButton;
+        private System.Windows.Forms.Button CopyButton;
     }
 }

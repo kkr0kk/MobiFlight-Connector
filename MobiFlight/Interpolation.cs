@@ -83,9 +83,10 @@ namespace MobiFlight
                                double.Parse(reader["y"], serializationCulture));
                     reader.ReadToNextSibling("value");
                 } while (reader.LocalName == "value");
-
-                reader.ReadEndElement();
             }
+
+            if (reader.LocalName == "interpolation")
+                reader.Read(); // this closes the interpolation node
         }
 
         public double Value(double x)
@@ -160,6 +161,7 @@ namespace MobiFlight
                 Max == (obj as Interpolation).Max &&
                 Min == (obj as Interpolation).Min &&
                 Count == (obj as Interpolation).Count &&
+                Active == (obj as Interpolation).Active &&
                 entriesAreSame;
         }
     }

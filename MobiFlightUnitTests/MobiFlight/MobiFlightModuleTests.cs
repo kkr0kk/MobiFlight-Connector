@@ -44,13 +44,36 @@ namespace MobiFlight.Tests
         public void LoadConfigTest()
         {
             Assert.Fail();
+            /*
+            MobiFlight.Config.Config config = new Config.Config();
+            MobiFlightModule module = new MobiFlightModule("COM1", BoardDefinitions.GetBoardByMobiFlightType("asrduino_mega"));
+            module.Config = config;
+            config.Items.Add(new MobiFlightOutput() { })
+            module.LoadConfig();
+
+            // do the check for two devices with the same name
+            */
         }
 
         [TestMethod()]
-        [Ignore]
         public void GenerateUniqueDeviceNameTest()
         {
-            Assert.Fail();
+            List<String> UsedKeys = new List<String>() {
+            };
+
+            // Test with no Used Keys
+            Assert.AreEqual("TestDevice", MobiFlightModule.GenerateUniqueDeviceName(UsedKeys.ToArray(), "TestDevice"), "Name is not as expected.");
+
+            UsedKeys.Add("TestDevice");
+            Assert.AreEqual("TestDevice 1", MobiFlightModule.GenerateUniqueDeviceName(UsedKeys.ToArray(), "TestDevice"), "Name is not as expected.");
+
+            UsedKeys.Add("TestDevice 2");
+            Assert.AreEqual("TestDevice 1", MobiFlightModule.GenerateUniqueDeviceName(UsedKeys.ToArray(), "TestDevice"), "Name is not as expected.");
+
+            UsedKeys.Add("TestDevice 1");
+            Assert.AreEqual("TestDevice 3", MobiFlightModule.GenerateUniqueDeviceName(UsedKeys.ToArray(), "TestDevice"), "Name is not as expected.");
+
+            Assert.AreEqual("TestDevice 1 1", MobiFlightModule.GenerateUniqueDeviceName(UsedKeys.ToArray(), "TestDevice 1"), "Name is not as expected.");
         }
 
         [TestMethod()]
@@ -189,16 +212,17 @@ namespace MobiFlight.Tests
         [TestMethod()]
         public void GetFreePinsTest()
         {
-            MobiFlightModuleConfig moduleConfig = new MobiFlightModuleConfig();
-            MobiFlightModule o = new MobiFlightModule(moduleConfig);
-            o.Type = MobiFlightModuleInfo.TYPE_MEGA;
+            BoardDefinitions.Load();
+
+            var board = BoardDefinitions.GetBoardByMobiFlightType("MobiFlight Mega");
+            MobiFlightModule o = new MobiFlightModule("COM1", board);
             o.Config = new Config.Config();
 
-            Assert.AreEqual(MobiFlightModuleInfo.MEGA_PINS.Count(), o.GetFreePins().Count, "Number of free pins is wrong");
+            Assert.AreEqual(board.Pins.Count(), o.GetFreePins().Count, "Number of free pins is wrong");
             o.Config.Items.Add(new Config.Button() { Name = "Test", Pin = "2" });
             o.Config.Items.Add(new Config.Button() { Name = "Test", Pin = "5" });
 
-            Assert.AreEqual(MobiFlightModuleInfo.MEGA_PINS.Count() - o.Config.Items.Count, o.GetFreePins().Count, "Number of free pins is wrong");
+            Assert.AreEqual(board.Pins.Count() - o.Config.Items.Count, o.GetFreePins().Count, "Number of free pins is wrong");
             Assert.AreEqual(false, o.GetFreePins().Exists(x=>x.Pin==2), "Used pin still available");
             Assert.AreEqual(false, o.GetFreePins().Exists(x => x.Pin == 5), "Used pin still available");
             Assert.AreEqual(true, o.GetFreePins().Exists(x => x.Pin == 52), "Free pin not available");
@@ -207,7 +231,9 @@ namespace MobiFlight.Tests
             Assert.AreEqual(false, o.GetFreePins().Exists(x => x.Pin == 3), "Used pin still available");
             Assert.AreEqual(true, o.GetFreePins().Exists(x => x.Pin == 2), "Free pin not available");
 
-            o.Type = MobiFlightModuleInfo.TYPE_UNO;
+            board = BoardDefinitions.GetBoardByMobiFlightType("MobiFlight Uno");
+            o = new MobiFlightModule("COM1", board);
+            o.Config = new Config.Config();
             Assert.AreEqual(true, o.GetFreePins().Exists(x => x.Pin == 13), "Free pin not available");
             Assert.AreEqual(false, o.GetFreePins().Exists(x => x.Pin == 52), "Invalid pin available");
         }

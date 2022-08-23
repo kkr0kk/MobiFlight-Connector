@@ -52,7 +52,6 @@ namespace MobiFlight.InputConfig.Tests
             o.ReadXml(xmlReader);
 
             Assert.AreEqual("AnalogInputConfigReadXML", (o.onChange as VariableInputAction).Variable.Name, "Variable.Name are not Equal");
-
         }
 
         [TestMethod()]
@@ -91,6 +90,23 @@ namespace MobiFlight.InputConfig.Tests
             o2 = generateTestObject();
 
             Assert.IsTrue(o1.Equals(o2));
+        }
+
+        [TestMethod()]
+        public void GetInputActionsByTypeTest()
+        {
+            AnalogInputConfig cfg = new AnalogInputConfig();
+            cfg.onChange = new VariableInputAction();
+            
+            var result = cfg.GetInputActionsByType(typeof(VariableInputAction));
+            Assert.AreEqual(result.Count, 1);
+            Assert.AreEqual(result[0].GetType(), typeof(VariableInputAction));
+
+
+            cfg.onChange = new MSFS2020CustomInputAction();
+
+            result = cfg.GetInputActionsByType(typeof(VariableInputAction));
+            Assert.AreEqual(result.Count, 0);
         }
     }
 }

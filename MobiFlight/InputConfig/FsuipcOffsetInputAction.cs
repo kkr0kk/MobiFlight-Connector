@@ -66,13 +66,12 @@ namespace MobiFlight.InputConfig
         }   
 
         public override void execute(
-            FSUIPC.FSUIPCCacheInterface cache, 
-            SimConnectMSFS.SimConnectCacheInterface simConnectCache, 
-            MobiFlightCacheInterface moduleCache, 
+            CacheCollection cacheCollection, 
             InputEventArgs args,
             List<ConfigRefValue> configRefs)
         {
             String value = Value;
+            FSUIPC.FSUIPCCacheInterface cache = cacheCollection.fsuipcCache;
 
             List<Tuple<string, string>> replacements = new List<Tuple<string, string>>();
             foreach (ConfigRefValue item in configRefs)
@@ -119,7 +118,7 @@ namespace MobiFlight.InputConfig
             {
                 System.Globalization.NumberStyles format = System.Globalization.NumberStyles.Integer;
                 if (FSUIPC.BcdMode) format = System.Globalization.NumberStyles.HexNumber;
-                Int16 sValue = Int16.Parse(Math.Floor(double.Parse(value)).ToString());
+                Int16 sValue = Int16.Parse(Math.Floor(double.Parse(value)).ToString(), format);
                 if (FSUIPC.Mask != 0xFFFF)
                 {
                     Int16 cByte = (Int16)cache.getValue(FSUIPC.Offset, FSUIPC.Size);

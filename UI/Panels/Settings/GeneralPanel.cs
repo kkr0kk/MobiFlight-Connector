@@ -45,12 +45,15 @@ namespace MobiFlight.UI.Panels.Settings
             else if (Properties.Settings.Default.TestTimerInterval == 125) testModeSpeedTrackBar.Value = 3;
             else if (Properties.Settings.Default.TestTimerInterval == 50) testModeSpeedTrackBar.Value = 4;
 
+            // Config Execution Speed
+            int ExecutionSpeedInTicks = (int)Math.Floor(Properties.Settings.Default.PollInterval / 25.0);
+            // Maximum is 10, and Minimum is 1
+            fsuipcPollIntervalTrackBar.Value = Math.Max(fsuipcPollIntervalTrackBar.Minimum, (fsuipcPollIntervalTrackBar.Maximum + fsuipcPollIntervalTrackBar.Minimum - ExecutionSpeedInTicks));
+
             // Debug Mode
             logLevelCheckBox.Checked = Properties.Settings.Default.LogEnabled;
             ComboBoxHelper.SetSelectedItem(logLevelComboBox, Properties.Settings.Default.LogLevel);
-
-            // Offline Mode
-            offlineModeCheckBox.Checked = Properties.Settings.Default.OfflineMode;
+            LogJoystickAxisCheckBox.Checked = Properties.Settings.Default.LogJoystickAxis;
 
             // System Language
             languageComboBox.SelectedValue = Properties.Settings.Default.Language;
@@ -70,6 +73,9 @@ namespace MobiFlight.UI.Panels.Settings
             else if (testModeSpeedTrackBar.Value == 3) Properties.Settings.Default.TestTimerInterval = 125;
             else Properties.Settings.Default.TestTimerInterval = 50;
 
+            // Config Execution Speed
+            Properties.Settings.Default.PollInterval = (int)(((fsuipcPollIntervalTrackBar.Maximum + fsuipcPollIntervalTrackBar.Minimum) - fsuipcPollIntervalTrackBar.Value) * 25);
+
             // Recent Files max count
             Properties.Settings.Default.RecentFilesMaxCount = (int)recentFilesNumericUpDown.Value;
 
@@ -79,8 +85,8 @@ namespace MobiFlight.UI.Panels.Settings
             Log.Instance.Enabled = logLevelCheckBox.Checked;
             Log.Instance.Severity = (LogSeverity)Enum.Parse(typeof(LogSeverity), Properties.Settings.Default.LogLevel);
 
-            // Offline Mode
-            Properties.Settings.Default.OfflineMode = offlineModeCheckBox.Checked;
+            Properties.Settings.Default.LogJoystickAxis = LogJoystickAxisCheckBox.Checked;
+            Log.Instance.LogJoystickAxis = LogJoystickAxisCheckBox.Checked;
 
             // System Language
             Properties.Settings.Default.Language = languageComboBox.SelectedValue.ToString();

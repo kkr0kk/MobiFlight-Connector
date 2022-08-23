@@ -355,7 +355,9 @@ Du musst einen gültigen Pfad zu Deiner Arduino IDE angeben (min. 1.0.5).</value
     <value>Der Wert darf nicht leer sein.</value>
   </data>
   <data name="uiMessageUpdateArduinoOkCancel" xml:space="preserve">
-    <value>Es wurden Arduinos ohne MobiFlight Firmware gefunden - jetzt updaten?</value>
+    <value>Es wurden kompatible Arduinos ohne MobiFlight Firmware gefunden. Um sie zu verwenden benötigen sie die neueste Firmware.
+
+Jetzt MobiFlight Firmware hochladen!</value>
   </data>
   <data name="uiMessageUpdateOldFirmwareOkCancel" xml:space="preserve">
     <value>Die Firmware der MobiFlight Boards ist nicht aktuell - jetzt updaten?</value>
@@ -435,12 +437,6 @@ Du kannst es jederzeit wieder in den Einstellungen aktivieren </value>
   <data name="uiMessageNoSimConnectConnection" xml:space="preserve">
     <value>Keine aktive SimConnect Verbindung.</value>
   </data>
-  <data name="uiSimConnectPanelComboBoxPresetSelect" xml:space="preserve">
-    <value>Preset auswählen</value>
-  </data>
-  <data name="uiSimConnectPanelComboBoxPresetSelectGroup" xml:space="preserve">
-    <value>Preset Gruppe auswählen</value>
-  </data>
   <data name="uiMessageSimConnectConnectionLost" xml:space="preserve">
     <value>Die Verbindung zu SimConnect wurde unterbrochen.</value>
   </data>
@@ -453,5 +449,50 @@ Du kannst es jederzeit wieder in den Einstellungen aktivieren </value>
   <data name="uiMessageFirmwareUploadError" xml:space="preserve">
     <value>Es gab einen Fehler beim Firmware Upload. Aktiviere Logging für mehr Informationen.</value>
     <comment>There was an error on uploading the firmware!\nEnable Debug Logging for more details.</comment>
+  </data>
+  <data name="uiMessageNoNotConnectedJoysticksInConfigFound" xml:space="preserve">
+    <value>Keine fehlenden Joysticks gefunden.</value>
+    <comment>There are no missing joysticks found.</comment>
+  </data>
+  <data name="uiMessageNotConnectedJoysticksInConfigFound" xml:space="preserve">
+    <value>Die folgenden Joysticks sind aktuell nicht angeschlossen, werden aber in der Config verwendet:
+
+{0}
+
+Die entsprechenden Input Actions funktionieren nicht bis der Joystick wieder angeschlossen und MobiFlight neu gestartet ist.</value>
+    <comment>The following joysticks are currently not connected but referenced in the config:
+
+{0}
+
+Respective input actions won't work until they are connected and you have restarted MobiFlight.</comment>
+  </data>
+  <data name="uiMessageFirmwareUpdateStatus" xml:space="preserve">
+    <value>Update von {0} an {1} (Modul {2}/{3})</value>
+    <comment>Updating {0} on {1} (Module {2}/{3})</comment>
+  </data>
+  <data name="uiMessageFirmwareUploadTitle" xml:space="preserve">
+    <value>Firmware Update</value>
+  </data>
+  <data name="uiMessageUpdateArduinoTitle" xml:space="preserve">
+    <value>Kompatible Boards gefunden!</value>
+  </data>
+  <data name="uiMessageUpdateOldFirmwareTitle" xml:space="preserve">
+    <value>Neue Firmware verfügbar!</value>
+  </data>
+  <data name="uiMessageNoMoreConfigReferenceAvailable" xml:space="preserve">
+    <value>Du kannst schon alle Configs referenzieren. Mehr hinzuzufügen macht keinen Sinn.</value>
+    <comment>You already can reference all available configs. Adding more doesn't make sense.</comment>
+  </data>
+  <data name="uiMessagesSimConnectPanelMatchesFound" xml:space="preserve">
+    <value>{0} Treffer gefunden</value>
+    <comment>{0} matches found.</comment>
+  </data>
+  <data name="uiMessagesSimConnectPanelShowAll" xml:space="preserve">
+    <value>- Alle zeigen - </value>
+    <comment>- show all - </comment>
+  </data>
+  <data name="uiSettingsMobiFlightChangeRequiresRestart" xml:space="preserve">
+    <value>Diese Änderung benötigt einen Neustart von MobiFlight.</value>
+    <comment>This change will require a restart of MobiFlight to become effective.</comment>
   </data>
 </root>

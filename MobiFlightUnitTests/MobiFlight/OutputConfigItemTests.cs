@@ -78,12 +78,73 @@ namespace MobiFlight.Tests
             oci.ReadXml(xmlReader);
             Assert.AreEqual(true, oci.Interpolation.Active, "Interpolation is supposed to be active");
             Assert.AreEqual(5, oci.Interpolation.Count);
+
+            // read buttoninputaction
+            // read problem with interpolation OUTSIDE of display node
+            s = System.IO.File.ReadAllText(@"assets\MobiFlight\OutputConfig\OutputConfigItem\ReadXmlTest.ButtonInputAction.xml");
+            sr = new StringReader(s);
+            xmlReader = System.Xml.XmlReader.Create(sr, settings);
+            oci.ReadXml(xmlReader);
+            Assert.IsNotNull(oci.ButtonInputConfig, "ButtonInputConfig null");
+            Assert.IsNotNull(oci.ButtonInputConfig.onPress, "ButtonInputConfig.onPress null");
+            Assert.IsNotNull(oci.ButtonInputConfig.onRelease, "ButtonInputConfig.onRelease null");
+            Assert.IsNotNull(oci.ButtonInputConfig.onPress as MobiFlight.InputConfig.MSFS2020CustomInputAction, "Not of type MobiFlight.InputConfig.MSFS2020CustomInputAction");
+            Assert.AreEqual("Test", (oci.ButtonInputConfig.onPress as MobiFlight.InputConfig.MSFS2020CustomInputAction).Command, "Not correct Command.");
+            // read analoginputaction
+
+            // read buttoninputaction
+            // read problem with configrefs are not loaded correctly
+            s = System.IO.File.ReadAllText(@"assets\MobiFlight\OutputConfig\OutputConfigItem\ReadXmlTest.ButtonInputActionConfigRef.xml");
+            sr = new StringReader(s);
+            xmlReader = System.Xml.XmlReader.Create(sr, settings);
+            oci = new OutputConfigItem();
+            oci.ReadXml(xmlReader);
+            Assert.IsNotNull(oci.ButtonInputConfig, "ButtonInputConfig null");
+            Assert.IsNotNull(oci.ButtonInputConfig.onPress, "ButtonInputConfig.onPress null");
+            Assert.IsNull(oci.ButtonInputConfig.onRelease, "ButtonInputConfig.onRelease is not null");
+            Assert.IsNotNull(oci.ButtonInputConfig.onPress as MobiFlight.InputConfig.MSFS2020CustomInputAction, "Not of type MobiFlight.InputConfig.MSFS2020CustomInputAction");
+            Assert.AreEqual(1, oci.ConfigRefs.Count, "Count is not 1");
+
+            // read buttoninputaction
+            // read problem with configrefs are not loaded correctly
+            s = System.IO.File.ReadAllText(@"assets\MobiFlight\OutputConfig\OutputConfigItem\ReadXmlTest.AnalogInputActionProblem.xml");
+            sr = new StringReader(s);
+            xmlReader = System.Xml.XmlReader.Create(sr, settings);
+            oci = new OutputConfigItem();
+            oci.ReadXml(xmlReader);
+            Assert.IsNotNull(oci.AnalogInputConfig, "AnalogInputConfig null");
+            Assert.IsNotNull(oci.AnalogInputConfig.onChange, "AnalogInputConfig.onPress null");
+            Assert.IsNotNull(oci.AnalogInputConfig.onChange as MobiFlight.InputConfig.MSFS2020CustomInputAction, "Not of type MobiFlight.InputConfig.MSFS2020CustomInputAction");
+            Assert.AreEqual(0, oci.ConfigRefs.Count, "ConfigRefs Count is not 1");
+
+            // read buttoninputaction
+            // read problem with configrefs are not loaded correctly
+            s = System.IO.File.ReadAllText(@"assets\MobiFlight\OutputConfig\OutputConfigItem\ReadXmlTest.AnalogInputActionWithConfigRef.xml");
+            sr = new StringReader(s);
+            xmlReader = System.Xml.XmlReader.Create(sr, settings);
+            oci = new OutputConfigItem();
+            oci.ReadXml(xmlReader);
+            Assert.IsNotNull(oci.AnalogInputConfig, "AnalogInputConfig null");
+            Assert.IsNotNull(oci.AnalogInputConfig.onChange, "AnalogInputConfig.onPress null");
+            Assert.IsNotNull(oci.AnalogInputConfig.onChange as MobiFlight.InputConfig.MSFS2020CustomInputAction, "Not of type MobiFlight.InputConfig.MSFS2020CustomInputAction");
+            Assert.AreEqual(1, oci.ConfigRefs.Count, "ConfigRefs Count is not 1");
+
+            // problem with reading config after xplane native integration
+            s = System.IO.File.ReadAllText(@"assets\MobiFlight\OutputConfig\OutputConfigItem\ReadXmlTest.Interpolation.xml");
+            sr = new StringReader(s);
+            xmlReader = System.Xml.XmlReader.Create(sr, settings);
+            oci = new OutputConfigItem();
+            oci.ReadXml(xmlReader);
+            Assert.AreEqual("Display Module", oci.DisplayType, "Display Type not Display Module");
+            Assert.AreEqual(true, oci.Interpolation.Active, "AnalogInputConfig.onPress null");
+            Assert.AreEqual(5, oci.Interpolation.Count, "Interpolation Count is not 5");
         }
 
         [TestMethod()]
         public void WriteXmlTest()
         {
             StringWriter sw = new StringWriter();
+
             XmlWriterSettings settings = new XmlWriterSettings();
             settings.Encoding = System.Text.Encoding.UTF8;
             settings.Indent = true;
@@ -149,8 +210,8 @@ namespace MobiFlight.Tests
             Assert.AreEqual(o.BcdPins[0], c.BcdPins[0], "clone: BcdPins not the same");
 
             // Shift Register
-            Assert.AreEqual(o.ShiftRegister, c.ShiftRegister, "clone: ShiftRegister not the same");
-            Assert.AreEqual(o.RegisterOutputPin, c.RegisterOutputPin, "clone: RegisterOutputPin not the same");
+            Assert.AreEqual(o.ShiftRegister.Address, c.ShiftRegister.Address, "clone: ShiftRegister.Address not the same");
+            Assert.AreEqual(o.ShiftRegister.Pin, c.ShiftRegister.Pin, "clone: ShiftRegister.Address not the same");
 
             //o. = new Interpolation();
             Assert.AreEqual(o.Interpolation.Active, c.Interpolation.Active, "clone: Interpolation.Active is not the same.");
@@ -218,8 +279,14 @@ namespace MobiFlight.Tests
             o.Stepper.TestValue = "212";
             o.Stepper.CompassMode = true;
 
-            o.ShiftRegister = "ShiftRegister";
-            o.RegisterOutputPin = "99";
+            o.ShiftRegister = new OutputConfig.ShiftRegister()
+            {
+                Address = "ShiftRegister",
+                Pin = "99"
+            };
+
+            o.ButtonInputConfig = new InputConfig.ButtonInputConfig();
+            o.AnalogInputConfig = new InputConfig.AnalogInputConfig();
 
             o.ConfigRefs.Add(new ConfigRef() { Active = true, Placeholder = "#", Ref = "123" });
             o.ConfigRefs.Add(new ConfigRef() { Active = false, Placeholder = "$", Ref = "321" });
@@ -241,6 +308,17 @@ namespace MobiFlight.Tests
             o2 = _generateConfigItem();
 
             Assert.IsTrue(o1.Equals(o2));
+
+            o2.ShiftRegister.Address = "ShiftRegister1";
+            o2.ShiftRegister.Pin = "69";
+
+            Assert.IsFalse(o1.Equals(o2));
+
+            // reset o2
+            // https://github.com/MobiFlight/MobiFlight-Connector/issues/697
+            o2 = _generateConfigItem();
+            o2.Servo.MaxRotationPercent = "90";
+            Assert.IsFalse(o1.Equals(o2));
         }
     }
 }

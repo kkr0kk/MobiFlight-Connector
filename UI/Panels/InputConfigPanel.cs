@@ -16,6 +16,9 @@ namespace MobiFlight.UI.Panels
         public event EventHandler SettingsChanged;
         public event EventHandler SettingsDialogRequested;
 
+        private int lastClickedRow = -1;
+        private List<String> SelectedGuids = new List<String>();
+
         private object[] EditedItem = null;
         public ExecutionManager ExecutionManager { get; set; }
         public DataSet OutputDataSetConfig { get; set; }
@@ -234,20 +237,20 @@ namespace MobiFlight.UI.Panels
 
 
         private void inputsDataGridView_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
-        {
-            //foreach (DataGridViewRow gridRow in inputsDataGridView.Rows)
-            //{
-            //    if (gridRow.DataBoundItem == null) continue;
-            //    DataRow dataRow = ((gridRow.DataBoundItem as DataRowView).Row as DataRow);
-            //    if (dataRow["settings"] is InputConfigItem)
-            //    {
-            //        InputConfigItem cfg = (dataRow["settings"] as InputConfigItem);
+        { 
+            if (e.ListChangedType == ListChangedType.Reset)
+            {
+                foreach (DataGridViewRow row in (sender as DataGridView).Rows)
+                {
+                    if (row.DataBoundItem == null) continue;
 
-            //        gridRow.Cells["inputName"].Value = cfg.Name;
-            //        gridRow.Cells["inputType"].Value = cfg.Type;
-            //        gridRow.Cells["Module"].Value = cfg.ModuleSerial;
-            //    }
-            //}
+                    DataRow currentRow = (row.DataBoundItem as DataRowView).Row;
+                    String guid = currentRow["guid"].ToString();
+
+                    if (SelectedGuids.Contains(guid))
+                        row.Selected = true;
+                }
+            }
         }
 
 
@@ -259,7 +262,7 @@ namespace MobiFlight.UI.Panels
 
             // do something
             // toggle active if current key is a simple character
-            if (e.KeyCode.ToString().Length == 1)
+            if (e.KeyCode.ToString().Length == 1 && !e.Control)
             {
 
                 // handle clicks on header cells or row-header cells
@@ -339,6 +342,27 @@ namespace MobiFlight.UI.Panels
                     }
                 }
             }
+            else if (e.KeyCode == Keys.V && e.Control)
+            {
+                // handle clicks on header cells or row-header cells
+                if (dgv.CurrentRow.Index < 0 || dgv.CurrentCell.ColumnIndex < 0) return;
+                int index = dgv.CurrentRow.Index;
+
+                PasteFromClipboard(index+1);
+            }
+
+            else if (e.KeyCode == Keys.C && e.Control)
+            {
+                // handle clicks on header cells or row-header cells
+                if (dgv.CurrentRow.Index < 0 || dgv.CurrentCell.ColumnIndex < 0) return;
+
+                if ((inputsDataGridView.Rows[dgv.CurrentRow.Index].DataBoundItem as DataRowView).Row["description"] != null)
+                {
+                    String Description = (inputsDataGridView.Rows[dgv.CurrentRow.Index].DataBoundItem as DataRowView).Row["description"].ToString();
+                    InputConfigItem cfg = ((inputsDataGridView.Rows[dgv.CurrentRow.Index].DataBoundItem as DataRowView).Row["settings"] as InputConfigItem);
+                    CopyToClipboard(Description, cfg);
+                }
+            }
             else
             {
                 // do nothing
@@ -376,12 +400,31 @@ namespace MobiFlight.UI.Panels
             foreach (DataRow row in ConfigDataTable.Rows)
             {
                 InputConfigItem cfg = row["settings"] as InputConfigItem;
+                row["inputName"] = "-";
+                row["inputType"] = "-";
+                row["moduleSerial"] = "-";
+
                 if (cfg != null)
                 {
-                    row["inputName"] = cfg.Name;
-                    row["inputType"] = cfg.Type;
                     if (cfg.ModuleSerial == null) continue;
                     row["moduleSerial"] = cfg.ModuleSerial.Split('/')[0];
+
+                    if (cfg.Name=="") continue;
+
+                    // Input shift registers show their name in the grid as the shifter name + configured pin for clarity.
+                    if (cfg.Type == InputConfigItem.TYPE_INPUT_SHIFT_REGISTER)
+                    {
+                        row["inputName"] = $"{cfg.Name}:{cfg.inputShiftRegister.ExtPin}";
+                    }
+                    else
+                    if (cfg.Type == InputConfigItem.TYPE_INPUT_MULTIPLEXER) {
+                        row["inputName"] = $"{cfg.Name}:{cfg.inputMultiplexer?.DataPin}";
+                    } 
+                    else 
+                    {
+                        row["inputName"] = cfg.Name;
+                    }
+                    row["inputType"] = cfg.Type;                   
                 }
             }
         } //_restoreValuesInGridView()
@@ -395,6 +438,9 @@ namespace MobiFlight.UI.Panels
             if (rowview == null) return;
 
             DataRow row = rowview.Row;
+            if (row.RowState==DataRowState.Detached)
+                row.Table.Rows.Add(row);
+
             if (EditedItem != null &&
                 (   // this is the checkbox
                     (bool)row.ItemArray[0] != (bool)EditedItem[0] ||
@@ -417,6 +463,126 @@ namespace MobiFlight.UI.Panels
 
             if (rowview.Row.ItemArray != null)
                 EditedItem = rowview.Row.ItemArray;
+        }
+
+        private void dataGridViewConfig_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
+        {
+            e.Control.ContextMenu = new ContextMenu();
+            //e.Control.ContextMenuStrip = inputsDataGridViewContextMenuStrip;
+        }
+
+        private void copyToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            foreach (DataGridViewRow row in inputsDataGridView.SelectedRows)
+            {
+                // ignore new rows since they cannot be copied nor deleted
+                if (row.IsNewRow) continue;
+
+                DataRow currentRow = (row.DataBoundItem as DataRowView).Row;
+                String Description = currentRow["description"] as String;
+                InputConfigItem cfg = currentRow["settings"] as InputConfigItem;
+                CopyToClipboard(Description, cfg);
+                return;
+            }
+        }
+
+        private void pasteToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            foreach (DataGridViewRow row in inputsDataGridView.SelectedRows)
+            {
+                int index = row.Index;
+                PasteFromClipboard(index+1);
+                return;
+            }
+        }
+
+        private static void CopyToClipboard(string Description, InputConfigItem cfg)
+        {
+            System.Windows.Forms.Clipboard.SetText(Description);
+            Clipboard.Instance.InputConfigName = Description;
+
+            if (cfg != null)
+            {
+                Clipboard.Instance.InputConfigItem = cfg;
+            }
+        }
+
+        private void PasteFromClipboard(int index)
+        {
+            this.Validate();
+            DataRow currentRow = inputsDataTable.NewRow();
+            currentRow["guid"] = Guid.NewGuid();
+            currentRow["active"] = false;
+
+            if (Clipboard.Instance.InputConfigName != null)
+            {
+                currentRow["description"] = Clipboard.Instance.InputConfigName.Clone() as String;
+                currentRow["description"] += $" ({i18n._tr("suffixCopy")})";
+            }
+
+            if (Clipboard.Instance.InputConfigItem != null)
+            {
+                InputConfigItem cfg = Clipboard.Instance.InputConfigItem.Clone() as InputConfigItem;
+                currentRow["settings"] = cfg;
+            }
+
+            if (currentRow.RowState == DataRowState.Detached)
+            {
+                inputsDataTable.Rows.InsertAt(currentRow, index);
+            }
+
+            RestoreValuesInGridView();
+        }
+
+        private void inputsDataGridViewContextMenuStrip_Opening(object sender, CancelEventArgs e)
+        {
+            bool isNotLastRow = (lastClickedRow != inputsDataGridView.Rows.Count - 1);
+            copyToolStripMenuItem.Enabled = isNotLastRow;
+            pasteToolStripMenuItem.Enabled = Clipboard.Instance.InputConfigItem != null;
+            duplicateInputsRowToolStripMenuItem.Enabled = isNotLastRow;
+            deleteInputsRowToolStripMenuItem.Enabled = isNotLastRow;
+        }
+
+        private void inputsDataGridView_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            lastClickedRow = e.RowIndex;
+
+            if (e.Button == MouseButtons.Right)
+            {
+                if (inputsDataGridView.IsCurrentCellInEditMode) return;
+
+                inputsDataGridView.EndEdit();
+
+                if (e.RowIndex != -1)
+                {
+                    if (!(sender as DataGridView).Rows[e.RowIndex].Selected)
+                    {
+                        // reset all rows since we are not right clicking on a currently
+                        // selected one
+                        foreach (DataGridViewRow row in (sender as DataGridView).SelectedRows)
+                        {
+                            row.Selected = false;
+                        }
+                    }
+
+                    // the current one becomes selected in any case
+                    (sender as DataGridView).Rows[e.RowIndex].Selected = true;
+                }
+            }
+            else
+            {
+                if (e.RowIndex == -1)
+                {
+                    // we know that we have clicked on the header area for sorting
+                    SelectedGuids.Clear();
+                    foreach (DataGridViewRow row in (sender as DataGridView).SelectedRows)
+                    {
+                        DataRow currentRow = (row.DataBoundItem as DataRowView).Row;
+                        if (currentRow != null)
+                            SelectedGuids.Add(currentRow["guid"].ToString());
+                    }
+                }
+            }
         }
     }
 }

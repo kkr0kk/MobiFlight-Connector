@@ -13,7 +13,19 @@ namespace MobiFlight
         public CmdMessenger CmdMessenger { get; set; }
         public int ModuleNumber { get; set; }
         public int Brightness { get; set; }
-        public int SubModules { get; set; }
+        public int SubModules
+        {
+            get { return _state.Count; }
+            set { 
+                _state.Clear(); 
+                for(int i = 0; i < value; i++)
+                {
+                    _state.Add(new LedModuleState());
+                }
+            }
+        }
+
+        List<LedModuleState> _state = new List<LedModuleState>();
 
         private String _name = "Led Module";
         public String Name
@@ -35,22 +47,12 @@ namespace MobiFlight
         public MobiFlightLedModule()
         {
             Brightness = 15;
+            _state.Add(new LedModuleState());
         }
 
         protected void Initialize()
         {
             if (_initialized) return;
-
-            // Create command
-            /*
-            var command = new SendCommand((int)MobiFlightModule.Command.InitModule);
-            command.AddArgument(this.ModuleNumber);
-            command.AddArgument(this.Brightness);
-
-            // Send command
-            CmdMessenger.SendCommand(command);
-            */
-
             _initialized = true;
         }
 
@@ -62,7 +64,10 @@ namespace MobiFlight
 
             // clamp and reverse the string
             if (value.Length > 8) value = value.Substring(0, 8);
-            //while (value.Length < 8) value += " ";
+
+            // cache hit
+            if (_state[subModule] == null || !_state[subModule].DisplayRequiresUpdate(value, points, mask))
+                return;
 
             command.AddArgument(this.ModuleNumber);
             command.AddArgument(subModule);            
@@ -74,6 +79,7 @@ namespace MobiFlight
                                                       this.ModuleNumber + "," +
                                                       subModule + "," +
                                                       value + "," +
+                                                      points + "," +
                                                       mask + ";>", LogSeverity.Debug);
 
             // Send command
@@ -83,6 +89,10 @@ namespace MobiFlight
         public void SetBrightness(int subModule, String value)
         {
             if (!_initialized) Initialize();
+
+            // cache hit
+            if (_state[subModule] == null || !_state[subModule].SetBrightnessRequiresUpdate(value))
+                return;
 
             var command = new SendCommand((int)MobiFlightModule.Command.SetModuleBrightness);
 
@@ -98,6 +108,68 @@ namespace MobiFlight
                                                       value + ";>", LogSeverity.Debug);
             // Send command
             CmdMessenger.SendCommand(command);
+        }
+
+        // Blank the display when stopped
+        public void Stop()
+        {
+            for (int i = 0; i != SubModules; i++)
+            {
+                Display(i, "        ", 0, 0xff);
+                _state[i]?.Reset();
+            }    
+        }
+    }
+
+    public class LedModuleState
+    {
+        char[] Displays = { ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' };
+        byte Points = 0;
+        String Brigthness = "";
+
+        public bool DisplayRequiresUpdate(String value, byte points, byte mask)
+        {
+            bool DisplayUpdated = false;
+            
+            byte digit = 8;
+            byte pos = 0;
+            for (byte i = 0; i < 8; i++)
+            {
+                digit--;
+                if (((1 << digit) & mask) == 0)
+                    continue;
+
+                if (Displays[digit] != value[pos])
+                {
+                    Displays[digit] = value[pos];
+                    DisplayUpdated = true;
+                }
+                pos++;
+            }
+
+            if (Points != points)
+            {
+                Points = points;
+                DisplayUpdated = true;
+            }     
+
+            return DisplayUpdated;
+        }
+
+        public bool SetBrightnessRequiresUpdate(String value)
+        {
+            if (Brigthness == value)
+                return false;
+
+            Brigthness = value;
+            return true;
+        }
+
+        internal void Reset()
+        {
+            Displays = new[] { ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ' };
+            Points = 0;
+            Brigthness = "";
         }
     }
 }

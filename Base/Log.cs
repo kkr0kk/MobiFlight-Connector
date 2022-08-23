@@ -5,6 +5,8 @@ using System.Text;
 using System.Windows.Forms;
 using System.Threading;
 using System.IO;
+using System.Threading.Tasks;
+using MobiFlight.UI.Panels;
 
 namespace MobiFlight
 {
@@ -19,6 +21,7 @@ namespace MobiFlight
     public sealed class Log
     {
         private static readonly Log instance = new Log();
+        public static char[] ExpressionIndicator = { '=', '+', '-', '/', '%', '(', ')' };
         private List<ILogAppender> appenderList;
         private Log() { appenderList = new List<ILogAppender>(); }
 
@@ -48,6 +51,11 @@ namespace MobiFlight
             appenderList.Add(appender);
         }
 
+        public static bool LooksLikeExpression(String expression)
+        {
+            return expression.IndexOfAny(ExpressionIndicator) != -1;
+        }
+
         public Dictionary<String, int> GetStatistics()
         {
             Dictionary<String, int> result = new Dictionary<string, int>();
@@ -57,6 +65,7 @@ namespace MobiFlight
         }
 
         public bool Enabled { get; set; }
+        public bool LogJoystickAxis { get; set; }
     }
 
     public interface ILogAppender 
@@ -79,17 +88,47 @@ namespace MobiFlight
         public void log(string message, LogSeverity severity)
         {
             if (textBox == null) return;
-            
+
             // InvokeRequired required compares the thread ID of the
             // calling thread to the thread ID of the creating thread.
             // If these threads are different, it returns true.
             if (textBox.InvokeRequired)
             {
-                textBox.Invoke(new logCallback(log), new object[] { message, severity });
+                textBox.BeginInvoke(new logCallback(log), new object[] { message, severity });
             }
             else
             {
-                textBox.Text = DateTime.Now + "(" + DateTime.Now.Millisecond + ")" + ": " + message + Environment.NewLine + textBox.Text;
+                    textBox.Text = DateTime.Now + "(" + DateTime.Now.Millisecond + ")" + ": " + message + Environment.NewLine + textBox.Text;
+            }
+        }
+    }
+
+    public class LogAppenderLogPanel : ILogAppender
+    {
+        private LogPanel panel = null;
+        // This delegate enables asynchronous calls for setting
+        // the text property on a TextBox control.
+        delegate void logCallback(string message, LogSeverity severity);
+
+        public LogAppenderLogPanel(LogPanel panel)
+        {
+            this.panel = panel;
+        }
+
+        public void log(string message, LogSeverity severity)
+        {
+            if (panel == null) return;
+
+            // InvokeRequired required compares the thread ID of the
+            // calling thread to the thread ID of the creating thread.
+            // If these threads are different, it returns true.
+            if (panel.InvokeRequired)
+            {
+                panel.BeginInvoke(new logCallback(log), new object[] { message, severity });
+            }
+            else
+            {
+                panel.log(message, severity);
             }
         }
     }
@@ -110,25 +149,34 @@ namespace MobiFlight
                 File.Delete(FileName);
         }
 
-        public void log(string message, LogSeverity severity)
+        public async void log(string message, LogSeverity severity)
         {
-            // Set Status to Locked
-            _readWriteLock.EnterWriteLock();
-            try
+            await Task.Run(() =>
             {
-                String msg = DateTime.Now + "(" + DateTime.Now.Millisecond + ")" + ": " + message;
-                // Append text to the file
-                using (StreamWriter sw = File.AppendText(FileName))
+                // Set Status to Locked
+                _readWriteLock.EnterWriteLock();
+                try
                 {
-                    sw.WriteLine(msg);
-                    sw.Close();
+                    String msg = DateTime.Now + "(" + DateTime.Now.Millisecond + ")" + ": " + message;
+                    // Append text to the file
+                    using (StreamWriter sw = File.AppendText(FileName))
+                    {
+                        sw.WriteLine(msg);
+                        sw.Close();
+                    }
                 }
-            }
-            finally
-            {
-                // Release lock
-                _readWriteLock.ExitWriteLock();
-            }
+                catch
+                {
+                    // Fix for https://github.com/MobiFlight/MobiFlight-Connector/issues/757
+                    // If something goes wrong writing to the log file it's just the log file, no need to crash
+                    // or do anything special. Just ignore the exception and keep going.
+                }
+                finally
+                {
+                    // Release lock
+                    _readWriteLock.ExitWriteLock();
+                }
+            });
         }
     }
 }

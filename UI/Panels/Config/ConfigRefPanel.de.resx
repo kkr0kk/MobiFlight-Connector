@@ -117,11 +117,13 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="textBox1.Text" xml:space="preserve">
-    <value>Definiere Verweise, die in dieser Config verwendet werden können.</value>
+  <data name="label2.Text" xml:space="preserve">
+    <value>Lege Referenzen zu anderer Konfigurationen an. Du kannst dann den Wert  in dieser Config verwenden.</value>
   </data>
-  <data name="textBox2.Text" xml:space="preserve">
-    <value>Es sind keine weiteren Configs vorhanden. Erstelle zuerst weitere, um diese dann hier verwenden zu können.
-</value>
+  <data name="addReferenceButton.Text" xml:space="preserve">
+    <value>Referenz anlegen</value>
+  </data>
+  <data name="label1.Text" xml:space="preserve">
+    <value>Es sind keine weiteren Configs vorhanden. Erstelle zuerst weitere, um diese dann hier verwenden zu können.</value>
   </data>
 </root>

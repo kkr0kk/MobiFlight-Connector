@@ -13,14 +13,16 @@ namespace MobiFlight.UI.Panels.Input
 {
     public partial class AnalogPanel : UserControl
     {
+        public event EventHandler<EventArgs> OnPanelChanged;
         InputConfig.AnalogInputConfig _config;
+        Dictionary<String, MobiFlightVariable> Variables = new Dictionary<String, MobiFlightVariable>();
 
         public AnalogPanel()
         {
             InitializeComponent();
 
             onChangeActionTypePanel.ActionTypeChanged += new MobiFlight.UI.Panels.Config.ActionTypePanel.ActionTypePanelSelectHandler(onChangeActionTypePanel_ActionTypeChanged);
-            
+            onChangeActionTypePanel.CopyPasteFeatureActive(false);
         }
 
         // On Press Action
@@ -89,35 +91,40 @@ namespace MobiFlight.UI.Panels.Input
 
                     break;
 
-                case MobiFlight.InputConfig.MSFS2020EventIdInputAction.Label:
-                    panel = new MobiFlight.UI.Panels.Action.MSFS2020InputPanel();
-                    if ( _config != null && _config.onChange != null)
-                        (panel as MobiFlight.UI.Panels.Action.MSFS2020InputPanel).syncFromConfig(_config.onChange as MSFS2020EventIdInputAction);
-
-                    break;
-
                 case MobiFlight.InputConfig.VariableInputAction.Label:
                     panel = new MobiFlight.UI.Panels.Action.VariableInputPanel();
+                    (panel as MobiFlight.UI.Panels.Action.VariableInputPanel).SetVariableReferences(Variables);
                     if (_config != null && _config.onChange != null)
                         (panel as MobiFlight.UI.Panels.Action.VariableInputPanel).syncFromConfig(_config.onChange as VariableInputAction);
 
                     break;
 
+                // For backward compatibility this is now combined and MSFS2020EventIdInputAction was removed
                 case MobiFlight.InputConfig.MSFS2020CustomInputAction.Label:
                     panel = new MobiFlight.UI.Panels.Action.MSFS2020CustomInputPanel();
                     if (_config != null && _config.onChange != null)
-                        (panel as MobiFlight.UI.Panels.Action.MSFS2020CustomInputPanel).syncFromConfig(_config.onChange as MSFS2020CustomInputAction);
+                    {
+                        if (_config.onChange is MSFS2020EventIdInputAction)
+                            (panel as MobiFlight.UI.Panels.Action.MSFS2020CustomInputPanel).syncFromConfig(_config.onChange as MSFS2020EventIdInputAction);
+                        else if (_config.onChange is MSFS2020CustomInputAction)
+                            (panel as MobiFlight.UI.Panels.Action.MSFS2020CustomInputPanel).syncFromConfig(_config.onChange as MSFS2020CustomInputAction);
+                    }
+                    break;
+
+                case MobiFlight.InputConfig.XplaneInputAction.Label:
+                    panel = new MobiFlight.UI.Panels.Action.XplaneInputPanel();
+                    if (_config != null && _config.onChange != null)
+                        (panel as MobiFlight.UI.Panels.Action.XplaneInputPanel).syncFromConfig(_config.onChange as XplaneInputAction);
 
                     break;
             }
 
             if (panel != null)
             {
-                panel.Padding = new Padding(0, 0, 0, 0);
-                panel.Width = owner.Width;
+                panel.Padding = new Padding(2, 0, 2, 0);
+                panel.Dock = DockStyle.Top;
                 owner.Controls.Add(panel);
-                panel.Height = owner.Height - 3;
-                panel.Dock = DockStyle.Fill;
+                OnPanelChanged?.Invoke(panel, EventArgs.Empty);
             }
         }
 
@@ -184,11 +191,20 @@ namespace MobiFlight.UI.Panels.Input
                         config.onChange = (onChangeActionConfigPanel.Controls[0] as MobiFlight.UI.Panels.Action.VariableInputPanel).ToConfig();
                         break;
 
+                    case MobiFlight.InputConfig.XplaneInputAction.Label:
+                        config.onChange = (onChangeActionConfigPanel.Controls[0] as MobiFlight.UI.Panels.Action.XplaneInputPanel).ToConfig();
+                        break;
+
                     default:
                         config.onChange = null;
                         break;
                 }
             }         
+        }
+
+        public void SetVariableReferences(Dictionary<String, MobiFlightVariable> variables)
+        {
+            Variables = variables;
         }
     }
 }

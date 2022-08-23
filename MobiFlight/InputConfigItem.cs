@@ -19,18 +19,22 @@ namespace MobiFlight
         // @see: https://forge.simple-solutions.de/issues/275
         private System.Globalization.CultureInfo serializationCulture = new System.Globalization.CultureInfo("de");
         public const String TYPE_NOTSET = "";
-        public const String TYPE_BUTTON = "Button";
-        public const String TYPE_ENCODER = "Encoder";
-        public const String TYPE_ANALOG = "Analog";
-
+        public const String TYPE_BUTTON = MobiFlightButton.TYPE;
+        public const String TYPE_ENCODER = MobiFlightEncoder.TYPE;
+        public const String TYPE_INPUT_SHIFT_REGISTER = MobiFlightInputShiftRegister.TYPE;
+        public const String TYPE_INPUT_MULTIPLEXER = MobiFlightInputMultiplexer.TYPE;
+        public const String TYPE_ANALOG = MobiFlightAnalogInput.TYPE;
+        // only for backward compatibility during loading
+        public const String TYPE_ANALOG_OLD = "Analog";
 
         public string ModuleSerial { get; set; }
         public string Name { get; set; }
         public string Type { get; set; }
         public ButtonInputConfig button { get; set; }
         public EncoderInputConfig encoder { get; set; }
+        public InputShiftRegisterConfig inputShiftRegister { get; set; }
+        public InputMultiplexerConfig inputMultiplexer { get; set; }
         public AnalogInputConfig analog { get; set; }
-
         public PreconditionList Preconditions { get; set; }
         public ConfigRefList ConfigRefs { get; set; }
 
@@ -40,6 +44,35 @@ namespace MobiFlight
             Type = TYPE_NOTSET;
 
             ConfigRefs = new ConfigRefList();
+        }
+
+        public List<InputAction> GetInputActionsByType(System.Type type)
+        {
+            List<InputAction> result = new List<InputAction>();
+            if (button != null)
+            {
+                result.AddRange(button.GetInputActionsByType(type));
+            }
+
+            if (encoder != null)
+            {
+                result.AddRange(encoder.GetInputActionsByType(type));
+            }
+
+            if (analog != null)
+            {
+                result.AddRange(analog.GetInputActionsByType(type));
+            }
+
+            if (inputShiftRegister != null)
+            {
+                result.AddRange(inputShiftRegister.GetInputActionsByType(type));
+            }
+
+            if (inputMultiplexer != null) {
+                result.AddRange(inputMultiplexer.GetInputActionsByType(type));
+            }
+            return result;
         }
 
         public System.Xml.Schema.XmlSchema GetSchema()
@@ -54,31 +87,39 @@ namespace MobiFlight
             if (reader["type"] != null && reader["type"] != "")
             {
                 Type = reader["type"];
+                if (Type == TYPE_ANALOG_OLD) Type = TYPE_ANALOG;
             }
 
             reader.Read(); // this should be the button or encoder
+
             if (reader.LocalName == "button")
             {
                 button = new ButtonInputConfig();
                 button.ReadXml(reader);
-                if (reader.NodeType != XmlNodeType.EndElement) reader.Read(); // this should be the corresponding "end" node
-                reader.Read(); // advance to the next node
             }
 
             if (reader.LocalName == "encoder")
             {
                 encoder = new EncoderInputConfig();
                 encoder.ReadXml(reader);
-                if (reader.NodeType != XmlNodeType.EndElement) reader.Read(); // this should be the corresponding "end" node
-                reader.Read(); // advance to the next node
+            }
+
+            if (reader.LocalName == "inputShiftRegister")
+            {
+                inputShiftRegister = new InputShiftRegisterConfig();
+                inputShiftRegister.ReadXml(reader);
+            }
+
+            if (reader.LocalName == "inputMultiplexer")
+            {
+                inputMultiplexer = new InputMultiplexerConfig();
+                inputMultiplexer.ReadXml(reader);
             }
 
             if (reader.LocalName == "analog")
             {
                 analog = new AnalogInputConfig();
                 analog.ReadXml(reader);
-                if (reader.NodeType != XmlNodeType.EndElement) reader.Read(); // this should be the corresponding "end" node
-                reader.Read(); // advance to the next node
             }
 
             // this is fallback, because type was not set in the past
@@ -108,10 +149,13 @@ namespace MobiFlight
                         Precondition tmp = new Precondition();
                         tmp.ReadXml(reader);
                         Preconditions.Add(tmp);
-                        reader.Read();
                     } while (reader.LocalName == "precondition");
                 }
-                if (reader.NodeType != XmlNodeType.EndElement) reader.Read(); // this should be the corresponding "end" node
+                if (reader.NodeType != XmlNodeType.EndElement) 
+                    reader.Read(); // this should be the corresponding "end" node
+
+                if (reader.NodeType == XmlNodeType.EndElement)
+                    reader.Read(); // move on to the next node
             }
 
             if (reader.LocalName == "configrefs")
@@ -126,7 +170,6 @@ namespace MobiFlight
                         ConfigRef tmp = new ConfigRef();
                         tmp.ReadXml(reader);
                         ConfigRefs.Add(tmp);
-                        reader.Read();
                     } while (reader.LocalName == "configref");
                 }
 
@@ -140,21 +183,35 @@ namespace MobiFlight
             writer.WriteAttributeString("name", this.Name);
             writer.WriteAttributeString("type", this.Type);
 
-            if (button != null)
+            if (this.Type == TYPE_BUTTON && button != null)
             {
                 writer.WriteStartElement("button");
                 button.WriteXml(writer);
                 writer.WriteEndElement();
             }
 
-            if (encoder != null)
+            if (this.Type == TYPE_ENCODER && encoder != null)
             {
                 writer.WriteStartElement("encoder");
                 encoder.WriteXml(writer);
                 writer.WriteEndElement();
             }
 
-            if (analog != null)
+            if (this.Type == TYPE_INPUT_SHIFT_REGISTER && inputShiftRegister != null)
+            {
+                writer.WriteStartElement("inputShiftRegister");
+                inputShiftRegister.WriteXml(writer);
+                writer.WriteEndElement();
+            }
+
+            if (this.Type == TYPE_INPUT_MULTIPLEXER && inputMultiplexer != null)
+            {
+                writer.WriteStartElement("inputMultiplexer");
+                inputMultiplexer.WriteXml(writer);
+                writer.WriteEndElement();
+            }
+
+            if (this.Type == TYPE_ANALOG && analog != null)
             {
                 writer.WriteStartElement("analog");
                 analog.WriteXml(writer);
@@ -189,6 +246,12 @@ namespace MobiFlight
             if (encoder != null)
                 clone.encoder = (EncoderInputConfig)this.encoder.Clone();
 
+            if (inputShiftRegister != null)
+                clone.inputShiftRegister = (InputShiftRegisterConfig)this.inputShiftRegister.Clone();
+
+            if (inputMultiplexer != null)
+                clone.inputMultiplexer = (InputMultiplexerConfig)this.inputMultiplexer.Clone();
+
             if (analog != null)
                 clone.analog = (AnalogInputConfig)this.analog.Clone();
 
@@ -206,9 +269,7 @@ namespace MobiFlight
         }
 
         internal void execute(
-            FSUIPC.Fsuipc2Cache fsuipcCache,
-            SimConnectMSFS.SimConnectCache simConnectCache,
-            MobiFlightCache moduleCache,
+            CacheCollection cacheCollection,
             InputEventArgs e,
             List<ConfigRefValue> configRefs)
         {
@@ -216,16 +277,26 @@ namespace MobiFlight
             {
                 case TYPE_BUTTON:
                     if (button != null)
-                        button.execute(fsuipcCache, simConnectCache, moduleCache, e, configRefs);
+                        button.execute(cacheCollection, e, configRefs);
                     break;
-
                 case TYPE_ENCODER:
                     if (encoder != null)
-                        encoder.execute(fsuipcCache, simConnectCache, moduleCache, e, configRefs);
+                        encoder.execute(cacheCollection, e, configRefs);
                     break;
+
+                case TYPE_INPUT_SHIFT_REGISTER:
+                    if (inputShiftRegister != null)
+                        inputShiftRegister.execute(cacheCollection, e, configRefs);
+                    break;
+
+                case TYPE_INPUT_MULTIPLEXER:
+                    if (inputMultiplexer != null)
+                        inputMultiplexer.execute(cacheCollection, e, configRefs);
+                    break;
+
                 case TYPE_ANALOG:
                     if (analog != null)
-                        analog.execute(fsuipcCache, simConnectCache, moduleCache, e, configRefs);
+                        analog.execute(cacheCollection, e, configRefs);
                     break;
             }
         }
@@ -236,7 +307,24 @@ namespace MobiFlight
 
             if (Type == TYPE_BUTTON)
             {
-                result = button.GetStatistics();
+                // explicit test is needed 
+                // in some older version we didn't save the node correctly
+                if (button != null)
+                    result = button?.GetStatistics();
+
+            } else if (Type == TYPE_ENCODER)
+            {
+                // explicit test is needed 
+                // in some older version we didn't save the node correctly
+                if (encoder != null)
+                    result = encoder.GetStatistics();
+            }
+            else if (Type == TYPE_ANALOG)
+            {
+                // explicit test is needed 
+                // in some older version we didn't save the node correctly
+                if (analog != null)
+                    result = analog.GetStatistics();
             }
 
             return result;
@@ -253,6 +341,8 @@ namespace MobiFlight
                 areSame = areSame && ((button == null && (obj as InputConfigItem).button == null) || (button != null && button.Equals((obj as InputConfigItem).button)));
                 areSame = areSame && ((encoder == null && (obj as InputConfigItem).encoder == null) || (encoder != null && encoder.Equals((obj as InputConfigItem).encoder)));
                 areSame = areSame && ((analog == null && (obj as InputConfigItem).analog == null) || (analog != null && analog.Equals((obj as InputConfigItem).analog)));
+                areSame = areSame && ((inputShiftRegister == null && (obj as InputConfigItem).inputShiftRegister == null) || (inputShiftRegister != null && inputShiftRegister.Equals((obj as InputConfigItem).inputShiftRegister)));
+                areSame = areSame && ((inputMultiplexer == null && (obj as InputConfigItem).inputMultiplexer == null) || (inputMultiplexer != null && inputMultiplexer.Equals((obj as InputConfigItem).inputMultiplexer)));
 
                 areSame = areSame && 
                             Preconditions.Equals((obj as InputConfigItem).Preconditions) &&
