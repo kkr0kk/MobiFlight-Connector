@@ -226,13 +226,13 @@ Möchten Sie die Änderungen jetzt speichern?</value>
   <data name="Please_Choose" xml:space="preserve">
     <value>Bitte wählen</value>
   </data>
-  <data name="LabelPrecondition_ArcazePin" xml:space="preserve">
+  <data name="Label_Precondition_ArcazePin" xml:space="preserve">
     <value>Pin</value>
   </data>
-  <data name="LabelPrecondition_ConfigItem" xml:space="preserve">
+  <data name="Label_Precondition_ConfigItem" xml:space="preserve">
     <value>Config Eintrag</value>
   </data>
-  <data name="LabelPrecondition_None" xml:space="preserve">
+  <data name="Label_Precondition_None" xml:space="preserve">
     <value>Keine</value>
   </data>
   <data name="Please_select_a_pin" xml:space="preserve">
@@ -459,7 +459,7 @@ Du kannst es jederzeit wieder in den Einstellungen aktivieren </value>
 
 {0}
 
-Die entsprechenden Input Actions funktionieren nicht bis der Joystick wieder angeschlossen und MobiFlight neu gestartet ist.</value>
+Die entsprechenden Konfigurationen funktionieren nicht bis der Joystick wieder angeschlossen und MobiFlight neu gestartet ist.</value>
     <comment>The following joysticks are currently not connected but referenced in the config:
 
 {0}
@@ -494,5 +494,88 @@ Respective input actions won't work until they are connected and you have restar
   <data name="uiSettingsMobiFlightChangeRequiresRestart" xml:space="preserve">
     <value>Diese Änderung benötigt einen Neustart von MobiFlight.</value>
     <comment>This change will require a restart of MobiFlight to become effective.</comment>
+  </data>
+  <data name="uiMessageFirmwareResetComplete" xml:space="preserve">
+    <value>{0} ({1}) Firmware Reset fertig. ({2}/{3})</value>
+  </data>
+  <data name="uiMessageFirmwareResetStatus" xml:space="preserve">
+    <value>Update von {0} an {1} (Modul {2}/{3})</value>
+  </data>
+  <data name="uiMessageFirmwareResetTimeout" xml:space="preserve">
+    <value>{0} ({1}) Firmware Reset time out. ({2}/{3})</value>
+  </data>
+  <data name="uiMessageFirmwareUpdateComplete" xml:space="preserve">
+    <value>{0} ({1}) Firmware Update fertig.({2}/{3})</value>
+  </data>
+  <data name="uiMessageFirmwareUpdateTimeout" xml:space="preserve">
+    <value>{0} ({1}) Firmware Update time out ({2}/{3})</value>
+  </data>
+  <data name="fsuipcStatus" xml:space="preserve">
+    <value>FSUIPC Status</value>
+  </data>
+  <data name="uiI2CPinInUse" xml:space="preserve">
+    <value>{0} braucht Pin {1} welcher bereits verwendet wird. Lösche die Zuordnung und versuche es mit {0} nochmal.</value>
+    <comment>{0} requires the use of pin {1} which is already assigned to another module. Remove the pin assignment from the other module then try adding {0} again.</comment>
+  </data>
+  <data name="uiI2CPinInUseHint" xml:space="preserve">
+    <value>I2C Pin in Verwendung</value>
+    <comment>I2C pin in use</comment>
+  </data>
+  <data name="uiMessageFirmwareResetSuccessful" xml:space="preserve">
+    <value>Der Reset Deines Boards war erfolgreich.</value>
+  </data>
+  <data name="uiMessageFirmwareResetTitle" xml:space="preserve">
+    <value>Board Reset</value>
+  </data>
+  <data name="uiMessageRestartRequired" xml:space="preserve">
+    <value>Damit diese Änderung wirksam wird, benötigt MobiFlight einen Neustart.</value>
+    <comment>This change will require a restart of MobiFlight to become effective.</comment>
+  </data>
+  <data name="uiMessageFirmwareUploadAmbiguousBoards" xml:space="preserve">
+    <value>Ein oder mehrer Boards konnten nicht automatisch mit der MobiFlight Firmware geflasht werden.
+
+{0}
+
+Bitte führe im nächsten Dialog das Flashen manuell durch und wähle den passenden Board-Typ aus dem Kontextmenü.</value>
+    <comment>Some boards can't be auto-flashed because the board type is ambiguous.
+
+Please manually flash the boards using "upload firmware" and select the correct board type from the menu.</comment>
+  </data>
+  <data name="uiMessageFirmwareResetError" xml:space="preserve">
+    <value>Es gab einen Fehler beim Board Reset. Aktiviere Logging für mehr Informationen.</value>
+  </data>
+  <data name="uiMessageFirmwareUploadTimeout" xml:space="preserve">
+    <value>Das Firmware Upload hat einen Timeout gemeldet. Aktiviere Logging für mehr Informationen.</value>
+  </data>
+  <data name="Label_Precondition_Variable" xml:space="preserve">
+    <value>MobiFlight Variable</value>
+  </data>
+  <data name="Label_Precondition_choose_config" xml:space="preserve">
+    <value>Wähle Config</value>
+  </data>
+  <data name="Label_Precondition_choose_variable" xml:space="preserve">
+    <value>Wähle Variable</value>
+  </data>
+  <data name="uiMessageValidationMustBeNumber" xml:space="preserve">
+    <value>Der Wert muss eine gültige Zahl sein.</value>
+    <comment>The value must be a valid number.</comment>
+  </data>
+  <data name="uiMessageHubHopUpdateError" xml:space="preserve">
+    <value>Update der HubHop Presets war nicht erfolgreich. Bitte checke das Log für weitere Details.</value>
+    <comment>Error on downloading HubHop presets. Please check the Log for more information.</comment>
+  </data>
+  <data name="uiMessageHubHopUpdateSuccessful" xml:space="preserve">
+    <value>Update der HubHop Presets war erfolgreich.</value>
+    <comment>HubHop presets download was successful.</comment>
+  </data>
+  <data name="uiMessageResetConfirm" xml:space="preserve">
+    <value>Möchtest Du wirklich die MobiFlight Firmware deinstallieren? Alle Deine Daten werden vom Board gelöscht.</value>
+  </data>
+  <data name="uiMessageResetHint" xml:space="preserve">
+    <value>Board zurücksetzen</value>
+  </data>
+  <data name="uiMessageNoXplaneConnection" xml:space="preserve">
+    <value>Keine aktive X-Plane Verbindung</value>
+    <comment>No active X-Plane connection</comment>
   </data>
 </root>

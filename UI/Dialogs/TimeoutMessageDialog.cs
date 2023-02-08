@@ -13,7 +13,7 @@ namespace MobiFlight.UI.Dialogs
     public partial class TimeoutMessageDialog : Form
     {
         private Timer TimeOutTimer = new Timer();
-        public int Timeout = 5;
+        public int Timeout = 10;
         public int Timestamp = 0;
         public DialogResult DefaultDialogResult = DialogResult.OK;
         private int TimeElapsedInMs;
@@ -51,7 +51,18 @@ namespace MobiFlight.UI.Dialogs
             tmd.HasCancelButton = buttons == MessageBoxButtons.OKCancel;
             tmd.Message = Message;
             tmd.Text = Title;
-            return tmd.ShowDialog();
+            return tmd.ShowDialog(tmd.Parent);
+        }
+
+        new public static DialogResult Show(Control Parent, string Message, String Title, MessageBoxButtons buttons, MessageBoxIcon icon)
+        {
+            TimeoutMessageDialog tmd = new TimeoutMessageDialog();
+            tmd.Parent = Parent;
+            tmd.StartPosition = FormStartPosition.CenterParent;
+            tmd.HasCancelButton = buttons == MessageBoxButtons.OKCancel;
+            tmd.Message = Message;
+            tmd.Text = Title;
+            return tmd.ShowDialog(tmd.Parent);
         }
 
         public TimeoutMessageDialog()
@@ -69,6 +80,7 @@ namespace MobiFlight.UI.Dialogs
         private void TimeoutMessageDialog_Shown(object sender, EventArgs e)
         {
             progressBar1.Maximum = Timeout * 1000;
+            TimeOutTimer.Tick -= TimeOutTimer_Tick;
             TimeOutTimer.Tick += TimeOutTimer_Tick;
             TimeOutTimer.Interval += 10;
             TimeElapsedInMs = 0;

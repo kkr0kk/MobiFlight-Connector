@@ -1,6 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MobiFlight;
 using MobiFlight.Base;
+using MobiFlight.Modifier;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -274,9 +275,9 @@ namespace MobiFlight.Tests
             o.Servo.MaxRotationPercent = "176";
 
             o.Stepper.Address = "S22";
-            o.Stepper.InputRev = "1123";
-            o.Stepper.OutputRev = "3212";
-            o.Stepper.TestValue = "212";
+            o.Stepper.InputRev = 1123;
+            o.Stepper.OutputRev = 3212;
+            o.Stepper.TestValue = 212;
             o.Stepper.CompassMode = true;
 
             o.ShiftRegister = new OutputConfig.ShiftRegister()
@@ -318,6 +319,10 @@ namespace MobiFlight.Tests
             // https://github.com/MobiFlight/MobiFlight-Connector/issues/697
             o2 = _generateConfigItem();
             o2.Servo.MaxRotationPercent = "90";
+            Assert.IsFalse(o1.Equals(o2));
+
+            o2 = _generateConfigItem();
+            o2.DisplayType = "nonsense";
             Assert.IsFalse(o1.Equals(o2));
         }
     }

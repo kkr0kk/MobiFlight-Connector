@@ -10,6 +10,7 @@ using MobiFlight.Base;
 using MobiFlight.Config;
 using MobiFlight.InputConfig;
 using MobiFlight.xplane;
+using MobiFlight.Modifier;
 
 namespace MobiFlight
 {
@@ -29,18 +30,16 @@ namespace MobiFlight
 		public MobiFlightVariable   MobiFlightVariable          { get; set; }
 
         public XplaneDataRef        XplaneDataRef               { get; set; }
-		public Transformation       Transform                   { get; set; }
 		public string               Value                       { get; set; }	
-		public OutputConfig.Comparison Comparison                  { get; set; }
+        public ModifierList         Modifiers                   { get; set; }
 		public string               DisplayType                 { get; set; }
 		public string               DisplaySerial               { get; set; }
 		public OutputConfig.Pin     Pin                         { get; set; }
-		public OutputConfig.LedModule   LedModule                   { get; set; }
-		public OutputConfig.LcdDisplay  LcdDisplay                  { get; set; }
+		public OutputConfig.LedModule   LedModule               { get; set; }
+		public OutputConfig.LcdDisplay  LcdDisplay              { get; set; }
 		public List<string>         BcdPins                     { get; set; }
         public OutputConfig.Servo   Servo { get; set; }
         public OutputConfig.Stepper Stepper { get; set; }
-        public Interpolation        Interpolation              { get; set; }
         public OutputConfig.ShiftRegister ShiftRegister               { get; set; }
         public string       DisplayTrigger              { get; set; }
         public PreconditionList   Preconditions       { get; set; }
@@ -50,6 +49,24 @@ namespace MobiFlight
 
         public InputConfig.AnalogInputConfig AnalogInputConfig { get; set; }
 
+        // Legacy access to Transformation, Comparison and Interpolation
+        public Modifier.Transformation Transform { 
+            get { return Modifiers.Transformation; }
+            set { Modifiers.Transformation = value; }
+        }
+
+        public Modifier.Comparison Comparison
+        {
+            get { return Modifiers.Comparison; }
+            set { Modifiers.Comparison = value; }
+        }
+
+        public Modifier.Interpolation Interpolation
+        {
+            get { return Modifiers.Interpolation; }
+            set { Modifiers.Interpolation = value; }
+        }
+
         public OutputConfigItem()
         {
             SourceType = SourceType.SIMCONNECT;
@@ -57,8 +74,7 @@ namespace MobiFlight
             SimConnectValue = new SimConnectValue();
             MobiFlightVariable = new MobiFlightVariable();
             XplaneDataRef = new XplaneDataRef();
-            Transform = new Transformation();
-            Comparison = new OutputConfig.Comparison();
+            Modifiers = new ModifierList();
             Pin = new OutputConfig.Pin();
             LedModule = new OutputConfig.LedModule();
             LcdDisplay = new OutputConfig.LcdDisplay();
@@ -66,7 +82,6 @@ namespace MobiFlight
             Stepper = new OutputConfig.Stepper() { CompassMode = false };
             BcdPins = new List<string>() { "A01", "A02", "A03", "A04", "A05" };
             ShiftRegister = new OutputConfig.ShiftRegister();
-            Interpolation = new Interpolation();
             Preconditions = new PreconditionList();
             ConfigRefs = new ConfigRefList();
             ButtonInputConfig = null;
@@ -77,6 +92,7 @@ namespace MobiFlight
         { 
             return (
                 obj != null && obj is OutputConfigItem &&
+                this.DisplayType == (obj as OutputConfigItem).DisplayType &&
                 this.DisplaySerial == (obj as OutputConfigItem).DisplaySerial &&
                 this.SourceType == (obj as OutputConfigItem).SourceType &&
                 this.FSUIPC.Equals((obj as OutputConfigItem).FSUIPC) &&
@@ -154,23 +170,31 @@ namespace MobiFlight
                         Transform.Expression = "$*" + multiplier.ToString().Replace(',', '.');
                     }
                 }
+                reader.Read();
             }
 
-            if (reader.ReadToNextSibling("comparison"))
+            if (reader.LocalName == "modifiers")
             {
+                Modifiers.ReadXml(reader);
+            } else if (reader.LocalName == "comparison")
+            {
+                // backward compatibility when we have comparison
+                // as a single node instead of modifiers
                 Comparison.ReadXml(reader);
             }
 
             if (reader.ReadToNextSibling("display"))
             {
                 DisplayType = reader["type"];
-                // preserve backward compatibility
-                if (DisplayType == ArcazeLedDigit.OLDTYPE) DisplayType = ArcazeLedDigit.TYPE;
 
+                // preserve backward compatibility
+                if (DisplayType == "Pin") DisplayType = MobiFlightOutput.TYPE;
+                if (DisplayType == ArcazeLedDigit.OLDTYPE) DisplayType = ArcazeLedDigit.TYPE;
+                
                 DisplaySerial = reader["serial"];
                 DisplayTrigger = reader["trigger"];
 
-                if (DisplayType == MobiFlightOutput.TYPE || DisplayType == "Pin")
+                if (DisplayType == MobiFlightOutput.TYPE)
                 {
                     Pin.ReadXml(reader);
                 }
@@ -297,8 +321,7 @@ namespace MobiFlight
                     this.SimConnectValue.WriteXml(writer);
             writer.WriteEndElement();
 
-            
-            Comparison.WriteXml(writer);
+            Modifiers.WriteXml(writer);
 
             writer.WriteStartElement("display");
                 writer.WriteAttributeString("type", DisplayType);
@@ -316,15 +339,15 @@ namespace MobiFlight
             {
                 writer.WriteAttributeString("bcdPins", String.Join(",", BcdPins));
             }
-            else if (DisplayType == DeviceType.Servo.ToString("F"))
+            else if (DisplayType == MobiFlightServo.TYPE)
             {
                 Servo.WriteXml(writer);
             }
-            else if (DisplayType == DeviceType.Stepper.ToString("F"))
+            else if (DisplayType == MobiFlightStepper.TYPE)
             {
                 Stepper.WriteXml(writer);
             }
-            else if (DisplayType == OutputConfig.LcdDisplay.Type)
+            else if (DisplayType == MobiFlightLcdDisplay.TYPE)
             {
                 if (LcdDisplay == null) LcdDisplay = new OutputConfig.LcdDisplay();
                 LcdDisplay.WriteXml(writer);
@@ -355,11 +378,7 @@ namespace MobiFlight
                                 
             writer.WriteEndElement(); // end of display
 
-            Interpolation.WriteXml(writer);
-
             Preconditions.WriteXml(writer);
-
-            Transform.WriteXml(writer);
 
             writer.WriteStartElement("configrefs");
             foreach (ConfigRef p in ConfigRefs)
@@ -380,7 +399,7 @@ namespace MobiFlight
 
 
             clone.Transform                 = this.Transform.Clone() as Transformation;
-            clone.Comparison                = this.Comparison.Clone() as OutputConfig.Comparison;
+            clone.Comparison                = this.Comparison.Clone() as Comparison;
 
             clone.DisplayType               = this.DisplayType;
             clone.DisplaySerial             = this.DisplaySerial;
@@ -400,10 +419,11 @@ namespace MobiFlight
             clone.LcdDisplay                = this.LcdDisplay.Clone() as OutputConfig.LcdDisplay;
             clone.Preconditions             = Preconditions.Clone() as PreconditionList;
 
-            clone.Interpolation             = this.Interpolation.Clone() as Interpolation;
             clone.ConfigRefs                = ConfigRefs.Clone() as ConfigRefList;
             clone.ButtonInputConfig         = this.ButtonInputConfig?.Clone() as InputConfig.ButtonInputConfig;
             clone.AnalogInputConfig         = this.AnalogInputConfig?.Clone() as InputConfig.AnalogInputConfig;
+
+            clone.Modifiers                 = this.Modifiers.Clone() as ModifierList;
             return clone;
         }
     }

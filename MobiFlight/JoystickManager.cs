@@ -45,9 +45,17 @@ namespace MobiFlight
             PollTimer.Start();
         }
 
-        public void Stop()
+        public void Shutdown()
         {
             PollTimer.Stop();
+        }
+
+        public void Stop()
+        {
+            foreach (var j in joysticks)
+            {
+                j.Stop();
+            }
         }
 
         public List<MobiFlight.Joystick> GetJoysticks()
@@ -64,15 +72,27 @@ namespace MobiFlight
 
             foreach (DeviceInstance d in devices)
             {
-                Log.Instance.log("Found attached DirectInput Device: " + d.InstanceName + ", Type: " + d.Type.ToString() + ", SubType: " + d.Subtype, LogSeverity.Debug);
+                Log.Instance.log($"Found attached DirectInput device: {d.InstanceName} Type: {d.Type} SubType: {d.Subtype}.", LogSeverity.Debug);
 
                 if (!IsSupportedDeviceType(d)) continue;
 
-                MobiFlight.Joystick js = new MobiFlight.Joystick(new SharpDX.DirectInput.Joystick(di, d.InstanceGuid));
-                
+                MobiFlight.Joystick js;
+                if (d.InstanceName == "Bravo Throttle Quadrant")
+                {
+                    js = new Joysticks.HoneycombBravo(new SharpDX.DirectInput.Joystick(di, d.InstanceGuid));
+                } else if (d.InstanceName == "Saitek Aviator Stick")
+                {
+                    js = new Joysticks.SaitekAviatorStick(new SharpDX.DirectInput.Joystick(di, d.InstanceGuid));
+                }
+                else
+                {
+                    js = new Joystick(new SharpDX.DirectInput.Joystick(di, d.InstanceGuid));
+                }
+                        
+
                 if (!HasAxisOrButtons(js)) continue;
 
-                Log.Instance.log("Adding attached Joystick Device: " + d.InstanceName + " Buttons " + js.Capabilities.ButtonCount + ", Axis: " + js.Capabilities.AxeCount, LogSeverity.Debug);
+                Log.Instance.log($"Adding attached joystick device: {d.InstanceName} Buttons: {js.Capabilities.ButtonCount} Axis: {js.Capabilities.AxeCount}.", LogSeverity.Info);
                 js.Connect(Handle); 
                 joysticks.Add(js);
                 js.OnButtonPressed += Js_OnButtonPressed;
@@ -87,7 +107,7 @@ namespace MobiFlight
         private void Js_OnDisconnected(object sender, EventArgs e)
         {
             Joystick js = sender as Joystick;
-            Log.Instance.log("Joystick Disconnected: " + js.Name, LogSeverity.Debug);
+            Log.Instance.log($"Joystick disconnected: {js.Name}.", LogSeverity.Info);
             lock (joysticks)
                 joysticks.Remove(js);            
         }

@@ -2,6 +2,7 @@
 using MobiFlight;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -16,14 +17,13 @@ namespace MobiFlight.Tests
         {
             ConnectorValue o = new ConnectorValue();
             o.Float64 = Double.MaxValue;
-            o.Int64 = Int64.MaxValue;
             o.String = "TestString";
 
             o.type = FSUIPCOffsetType.Float;
             Assert.AreEqual(Double.MaxValue.ToString(), o.ToString());
 
             o.type = FSUIPCOffsetType.Integer;
-            Assert.AreEqual(Int64.MaxValue.ToString(), o.ToString());
+            Assert.AreEqual(Double.MaxValue.ToString(), o.ToString());
 
             o.type = FSUIPCOffsetType.String;
             Assert.AreEqual("TestString", o.ToString());

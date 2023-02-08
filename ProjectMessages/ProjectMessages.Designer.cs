@@ -61,15 +61,6 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to .
-        /// </summary>
-        internal static string conf {
-            get {
-                return ResourceManager.GetString("conf", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to The address of a Display Module must not be null. Please review your config..
         /// </summary>
         internal static string ConfigErrorException_AddressNull {
@@ -171,32 +162,59 @@ namespace MobiFlight.ProjectMessages {
         /// <summary>
         ///   Looks up a localized string similar to Arcaze Pin.
         /// </summary>
-        internal static string LabelPrecondition_ArcazePin {
+        internal static string Label_Precondition_ArcazePin {
             get {
-                return ResourceManager.GetString("LabelPrecondition_ArcazePin", resourceCulture);
+                return ResourceManager.GetString("Label_Precondition_ArcazePin", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Choose config.
+        /// </summary>
+        internal static string Label_Precondition_choose_config {
+            get {
+                return ResourceManager.GetString("Label_Precondition_choose_config", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Choose variable.
+        /// </summary>
+        internal static string Label_Precondition_choose_variable {
+            get {
+                return ResourceManager.GetString("Label_Precondition_choose_variable", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Config item.
         /// </summary>
-        internal static string LabelPrecondition_ConfigItem {
+        internal static string Label_Precondition_ConfigItem {
             get {
-                return ResourceManager.GetString("LabelPrecondition_ConfigItem", resourceCulture);
+                return ResourceManager.GetString("Label_Precondition_ConfigItem", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to none.
         /// </summary>
-        internal static string LabelPrecondition_None {
+        internal static string Label_Precondition_None {
             get {
-                return ResourceManager.GetString("LabelPrecondition_None", resourceCulture);
+                return ResourceManager.GetString("Label_Precondition_None", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to There are still changes not uploaded to your modules. You will loose these changes if you close the form. Do you really want to continue?.
+        ///   Looks up a localized string similar to MobiFlight Variable.
+        /// </summary>
+        internal static string Label_Precondition_Variable {
+            get {
+                return ResourceManager.GetString("Label_Precondition_Variable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to There are still changes not uploaded to your modules. You will lose these changes if you close the form. Do you really want to continue?.
         /// </summary>
         internal static string MFModuleConfigChanged {
             get {
@@ -336,6 +354,24 @@ namespace MobiFlight.ProjectMessages {
         internal static string uiException_ConfigItemNotFound {
             get {
                 return ResourceManager.GetString("uiException_ConfigItemNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} requires the use of pin {1} which is already assigned to another module. Remove the pin assignment from the other module then try adding {0} again..
+        /// </summary>
+        internal static string uiI2CPinInUse {
+            get {
+                return ResourceManager.GetString("uiI2CPinInUse", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to I2C pin in use.
+        /// </summary>
+        internal static string uiI2CPinInUseHint {
+            get {
+                return ResourceManager.GetString("uiI2CPinInUseHint", resourceCulture);
             }
         }
         
@@ -552,11 +588,100 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to {0} ({1}) firmware reset completed ({2}/{3}).
+        /// </summary>
+        internal static string uiMessageFirmwareResetComplete {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareResetComplete", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to There was an error on resetting the board(s):
+        ///
+        ///{0}
+        ///
+        ///Check log for more details..
+        /// </summary>
+        internal static string uiMessageFirmwareResetError {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareResetError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Updating {0} on {1} (Module {2}/{3}).
+        /// </summary>
+        internal static string uiMessageFirmwareResetStatus {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareResetStatus", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The board reset was successful!.
+        /// </summary>
+        internal static string uiMessageFirmwareResetSuccessful {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareResetSuccessful", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} ({1}) firmware reset timed out ({2}/{3}).
+        /// </summary>
+        internal static string uiMessageFirmwareResetTimeout {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareResetTimeout", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Board reset.
+        /// </summary>
+        internal static string uiMessageFirmwareResetTitle {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareResetTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} ({1}) firmware update completed ({2}/{3}).
+        /// </summary>
+        internal static string uiMessageFirmwareUpdateComplete {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareUpdateComplete", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Updating {0} on {1} (Module {2}/{3}).
         /// </summary>
         internal static string uiMessageFirmwareUpdateStatus {
             get {
                 return ResourceManager.GetString("uiMessageFirmwareUpdateStatus", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} ({1}) firmware update timed out ({2}/{3}).
+        /// </summary>
+        internal static string uiMessageFirmwareUpdateTimeout {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareUpdateTimeout", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Some boards can&apos;t be auto-flashed because the board type is ambiguous:
+        ///
+        ///{0}
+        ///
+        ///Please manually flash the boards using &quot;upload firmware&quot; and select the correct board type from the menu..
+        /// </summary>
+        internal static string uiMessageFirmwareUploadAmbiguousBoards {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareUploadAmbiguousBoards", resourceCulture);
             }
         }
         
@@ -579,6 +704,15 @@ namespace MobiFlight.ProjectMessages {
         internal static string uiMessageFirmwareUploadSuccessful {
             get {
                 return ResourceManager.GetString("uiMessageFirmwareUploadSuccessful", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The firmware upload experienced a timeout..
+        /// </summary>
+        internal static string uiMessageFirmwareUploadTimeout {
+            get {
+                return ResourceManager.GetString("uiMessageFirmwareUploadTimeout", resourceCulture);
             }
         }
         
@@ -624,6 +758,24 @@ namespace MobiFlight.ProjectMessages {
         internal static string uiMessageFsuipcConnectionLost {
             get {
                 return ResourceManager.GetString("uiMessageFsuipcConnectionLost", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Error on downloading HubHop presets. Please check the Log for more information..
+        /// </summary>
+        internal static string uiMessageHubHopUpdateError {
+            get {
+                return ResourceManager.GetString("uiMessageHubHopUpdateError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to HubHop presets download was successful..
+        /// </summary>
+        internal static string uiMessageHubHopUpdateSuccessful {
+            get {
+                return ResourceManager.GetString("uiMessageHubHopUpdateSuccessful", resourceCulture);
             }
         }
         
@@ -778,7 +930,7 @@ namespace MobiFlight.ProjectMessages {
         ///
         ///{0}
         ///
-        ///Respective input actions won&apos;t work until they are connected and you have restarted MobiFlight..
+        ///Respective configs won&apos;t work until joysticks are connected and you have restarted MobiFlight..
         /// </summary>
         internal static string uiMessageNotConnectedJoysticksInConfigFound {
             get {
@@ -823,6 +975,15 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to No active X-Plane connection.
+        /// </summary>
+        internal static string uiMessageNoXplaneConnection {
+            get {
+                return ResourceManager.GetString("uiMessageNoXplaneConnection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The value must be a number and greater than 0..
         /// </summary>
         internal static string uiMessagePanelsStepperInputRevolutionsMustBeGreaterThan0 {
@@ -855,6 +1016,33 @@ namespace MobiFlight.ProjectMessages {
         internal static string uiMessageProblemLoadingConfig {
             get {
                 return ResourceManager.GetString("uiMessageProblemLoadingConfig", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Do you really want to uninstall the MobiFlight firmware? All your data will be removed from the board..
+        /// </summary>
+        internal static string uiMessageResetConfirm {
+            get {
+                return ResourceManager.GetString("uiMessageResetConfirm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Reset Board.
+        /// </summary>
+        internal static string uiMessageResetHint {
+            get {
+                return ResourceManager.GetString("uiMessageResetHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to This change will require a restart of MobiFlight to become effective..
+        /// </summary>
+        internal static string uiMessageRestartRequired {
+            get {
+                return ResourceManager.GetString("uiMessageRestartRequired", resourceCulture);
             }
         }
         
@@ -940,7 +1128,7 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Do you want to disable the automatic upload to new arduinos?
+        ///   Looks up a localized string similar to Do you want to disable the automatic upload to new modules?
         ///You can always enable it later again in the settings menu..
         /// </summary>
         internal static string uiMessageUpdateArduinoFwAutoDisableYesNo {
@@ -950,7 +1138,7 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Arduino boards found that are compatible with MobiFlight. To be able to use them they require the latest MobiFlight Firmware.
+        ///   Looks up a localized string similar to Modules found that are compatible with MobiFlight. To be able to use them they require the latest MobiFlight Firmware.
         ///
         ///Upload the MobiFlight Firmware now!.
         /// </summary>
@@ -1042,6 +1230,15 @@ namespace MobiFlight.ProjectMessages {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The value must be a valid number..
+        /// </summary>
+        internal static string uiMessageValidationMustBeNumber {
+            get {
+                return ResourceManager.GetString("uiMessageValidationMustBeNumber", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Value must be a number between {0} and {1}..
         /// </summary>
         internal static string uiMessageValidNumberInRange {
@@ -1110,6 +1307,24 @@ namespace MobiFlight.ProjectMessages {
         internal static string uiMessageWasmUpdater {
             get {
                 return ResourceManager.GetString("uiMessageWasmUpdater", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} requires I2C pins however {1} doesn&apos;t have any defined..
+        /// </summary>
+        internal static string uiNoI2CPinsDefined {
+            get {
+                return ResourceManager.GetString("uiNoI2CPinsDefined", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to No I2C pins defined.
+        /// </summary>
+        internal static string uiNoI2CPinsDefinedHint {
+            get {
+                return ResourceManager.GetString("uiNoI2CPinsDefinedHint", resourceCulture);
             }
         }
         

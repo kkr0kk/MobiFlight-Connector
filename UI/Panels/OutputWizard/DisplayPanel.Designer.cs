@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(DisplayPanel));
             this.displayTypeGroupBox = new System.Windows.Forms.GroupBox();
             this.InputActionTypePanel = new System.Windows.Forms.Panel();
@@ -46,12 +47,14 @@
             this.displayPinTestButton = new System.Windows.Forms.Button();
             this.groupBoxDisplaySettings = new System.Windows.Forms.GroupBox();
             this.inputActionGroupBox = new System.Windows.Forms.GroupBox();
-            this.buttonPanel1 = new MobiFlight.UI.Panels.Input.ButtonPanel();
-            this.analogPanel1 = new MobiFlight.UI.Panels.Input.AnalogPanel();
             this.AnalogInputActionLabel = new System.Windows.Forms.Label();
             this.ButtonInputActionLabel = new System.Windows.Forms.Label();
             this.OutputDevicePanel = new System.Windows.Forms.Panel();
             this.DisplayPanelTextLabel = new System.Windows.Forms.Label();
+            this.DeviceNotAvailableWarningLabel = new System.Windows.Forms.Label();
+            this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
+            this.buttonPanel1 = new MobiFlight.UI.Panels.Input.ButtonPanel();
+            this.analogPanel1 = new MobiFlight.UI.Panels.Input.AnalogPanel();
             this.displayTypeGroupBox.SuspendLayout();
             this.InputActionTypePanel.SuspendLayout();
             this.DisplayTypePanel.SuspendLayout();
@@ -72,9 +75,9 @@
             // 
             // InputActionTypePanel
             // 
-            resources.ApplyResources(this.InputActionTypePanel, "InputActionTypePanel");
             this.InputActionTypePanel.Controls.Add(this.InputTypeAnalogRadioButton);
             this.InputActionTypePanel.Controls.Add(this.InputTypeButtonRadioButton);
+            resources.ApplyResources(this.InputActionTypePanel, "InputActionTypePanel");
             this.InputActionTypePanel.Name = "InputActionTypePanel";
             // 
             // InputTypeAnalogRadioButton
@@ -95,11 +98,12 @@
             // 
             // DisplayTypePanel
             // 
-            resources.ApplyResources(this.DisplayTypePanel, "DisplayTypePanel");
+            this.DisplayTypePanel.Controls.Add(this.DeviceNotAvailableWarningLabel);
             this.DisplayTypePanel.Controls.Add(this.arcazeSerialLabel);
             this.DisplayTypePanel.Controls.Add(this.displayModuleNameComboBox);
             this.DisplayTypePanel.Controls.Add(this.displayTypeComboBoxLabel);
             this.DisplayTypePanel.Controls.Add(this.displayTypeComboBox);
+            resources.ApplyResources(this.DisplayTypePanel, "DisplayTypePanel");
             this.DisplayTypePanel.Name = "DisplayTypePanel";
             // 
             // arcazeSerialLabel
@@ -109,12 +113,12 @@
             // 
             // displayModuleNameComboBox
             // 
-            resources.ApplyResources(this.displayModuleNameComboBox, "displayModuleNameComboBox");
             this.displayModuleNameComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.displayModuleNameComboBox.FormattingEnabled = true;
             this.displayModuleNameComboBox.Items.AddRange(new object[] {
             resources.GetString("displayModuleNameComboBox.Items"),
             resources.GetString("displayModuleNameComboBox.Items1")});
+            resources.ApplyResources(this.displayModuleNameComboBox, "displayModuleNameComboBox");
             this.displayModuleNameComboBox.Name = "displayModuleNameComboBox";
             this.displayModuleNameComboBox.SelectedIndexChanged += new System.EventHandler(this.displaySerialComboBox_SelectedIndexChanged);
             // 
@@ -125,31 +129,31 @@
             // 
             // displayTypeComboBox
             // 
-            resources.ApplyResources(this.displayTypeComboBox, "displayTypeComboBox");
             this.displayTypeComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.displayTypeComboBox.FormattingEnabled = true;
             this.displayTypeComboBox.Items.AddRange(new object[] {
             resources.GetString("displayTypeComboBox.Items"),
             resources.GetString("displayTypeComboBox.Items1"),
             resources.GetString("displayTypeComboBox.Items2")});
+            resources.ApplyResources(this.displayTypeComboBox, "displayTypeComboBox");
             this.displayTypeComboBox.Name = "displayTypeComboBox";
             this.displayTypeComboBox.SelectedIndexChanged += new System.EventHandler(this.displayTypeComboBox_SelectedIndexChanged);
             // 
             // OutputTypePanel
             // 
-            resources.ApplyResources(this.OutputTypePanel, "OutputTypePanel");
             this.OutputTypePanel.Controls.Add(this.OutputTypeComboBox);
             this.OutputTypePanel.Controls.Add(this.OutputTypeLabel);
+            resources.ApplyResources(this.OutputTypePanel, "OutputTypePanel");
             this.OutputTypePanel.Name = "OutputTypePanel";
             // 
             // OutputTypeComboBox
             // 
-            resources.ApplyResources(this.OutputTypeComboBox, "OutputTypeComboBox");
             this.OutputTypeComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.OutputTypeComboBox.FormattingEnabled = true;
             this.OutputTypeComboBox.Items.AddRange(new object[] {
             resources.GetString("OutputTypeComboBox.Items"),
             resources.GetString("OutputTypeComboBox.Items1")});
+            resources.ApplyResources(this.OutputTypeComboBox, "OutputTypeComboBox");
             this.OutputTypeComboBox.Name = "OutputTypeComboBox";
             this.OutputTypeComboBox.SelectedIndexChanged += new System.EventHandler(this.OutputTypeComboBox_SelectedIndexChanged);
             // 
@@ -160,9 +164,9 @@
             // 
             // testSettingsGroupBox
             // 
-            resources.ApplyResources(this.testSettingsGroupBox, "testSettingsGroupBox");
             this.testSettingsGroupBox.Controls.Add(this.displayPinTestStopButton);
             this.testSettingsGroupBox.Controls.Add(this.displayPinTestButton);
+            resources.ApplyResources(this.testSettingsGroupBox, "testSettingsGroupBox");
             this.testSettingsGroupBox.Name = "testSettingsGroupBox";
             this.testSettingsGroupBox.TabStop = false;
             // 
@@ -198,16 +202,6 @@
             this.inputActionGroupBox.Name = "inputActionGroupBox";
             this.inputActionGroupBox.TabStop = false;
             // 
-            // buttonPanel1
-            // 
-            resources.ApplyResources(this.buttonPanel1, "buttonPanel1");
-            this.buttonPanel1.Name = "buttonPanel1";
-            // 
-            // analogPanel1
-            // 
-            resources.ApplyResources(this.analogPanel1, "analogPanel1");
-            this.analogPanel1.Name = "analogPanel1";
-            // 
             // AnalogInputActionLabel
             // 
             resources.ApplyResources(this.AnalogInputActionLabel, "AnalogInputActionLabel");
@@ -230,6 +224,22 @@
             // 
             resources.ApplyResources(this.DisplayPanelTextLabel, "DisplayPanelTextLabel");
             this.DisplayPanelTextLabel.Name = "DisplayPanelTextLabel";
+            // 
+            // DeviceNotAvailableWarningLabel
+            // 
+            resources.ApplyResources(this.DeviceNotAvailableWarningLabel, "DeviceNotAvailableWarningLabel");
+            this.DeviceNotAvailableWarningLabel.Name = "DeviceNotAvailableWarningLabel";
+            this.toolTip1.SetToolTip(this.DeviceNotAvailableWarningLabel, resources.GetString("DeviceNotAvailableWarningLabel.ToolTip"));
+            // 
+            // buttonPanel1
+            // 
+            resources.ApplyResources(this.buttonPanel1, "buttonPanel1");
+            this.buttonPanel1.Name = "buttonPanel1";
+            // 
+            // analogPanel1
+            // 
+            resources.ApplyResources(this.analogPanel1, "analogPanel1");
+            this.analogPanel1.Name = "analogPanel1";
             // 
             // DisplayPanel
             // 
@@ -279,5 +289,7 @@
         private Input.ButtonPanel buttonPanel1;
         private System.Windows.Forms.Label AnalogInputActionLabel;
         private System.Windows.Forms.Label ButtonInputActionLabel;
+        private System.Windows.Forms.Label DeviceNotAvailableWarningLabel;
+        private System.Windows.Forms.ToolTip toolTip1;
     }
 }

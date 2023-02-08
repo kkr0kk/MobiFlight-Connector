@@ -1,10 +1,10 @@
 {
   "$schema": "./mfboard.schema.json",
   "AvrDudeSettings": {
+    "Attempts": 1,
     "Device": "atmega328p",
-    "BaudRate": "115200",
+    "BaudRates": [ "115200" ],
     "Programmer": "arduino",
-    "FirmwareBaseName": "mobiflight_uno",
     "Timeout": 15000
   },
   "Connection": {
@@ -14,19 +14,26 @@
     "EEPROMSize": 286,
     "ExtraConnectionRetry": true,
     "ForceResetOnFirmwareUpdate": false,
-    "MessageSize": 32
+    "MessageSize": 64
   },
   "HardwareIds": [
     "^VID_2341&PID_0043",
     "^VID_2A03&PID_0043",
     "^VID_2341&PID_0243",
-    "^VID_2341&PID_0001"
+    "^VID_2341&PID_0001",
+    "^VID_1A86&PID_7523",
+    "^VID_0403&PID_6001",
+    "^VID_0403\\+PID_6001\\+.+"
   ],
   "Info": {
     "CanInstallFirmware": true,
+    "CanResetBoard": true,
     "FriendlyName": "Arduino Uno",
-    "LatestFirmwareVersion": "2.2.0",
-    "MobiFlightType": "MobiFlight Uno"
+    "FirmwareBaseName": "mobiflight_uno",
+    "FirmwareExtension": "hex",
+    "LatestFirmwareVersion": "2.4.0",
+    "MobiFlightType": "MobiFlight Uno",
+    "ResetFirmwareFile": "reset.arduino_uno_1_0_2.hex"
   },
   "ModuleLimits": {
     "MaxAnalogInputs": 6,
@@ -39,7 +46,7 @@
     "MaxServos": 2,
     "MaxShifters": 2,
     "MaxSteppers": 2,
-    "MaxInputMultiplexer": 1
+    "MaxInputMultiplexer": 3
   },
   "Pins": [
     {

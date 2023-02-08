@@ -57,12 +57,12 @@
             this.openYoutubeChannelToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
             this.überToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.releaseNotesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.panelMain = new System.Windows.Forms.Panel();
             this.inputsTabControl = new System.Windows.Forms.TabControl();
             this.OutputTabPage = new System.Windows.Forms.TabPage();
-            this.outputConfigPanel = new MobiFlight.UI.Panels.OutputConfigPanel();
             this.InputTabPage = new System.Windows.Forms.TabPage();
-            this.inputConfigPanel = new MobiFlight.UI.Panels.InputConfigPanel();
+            this.tabPageImageList = new System.Windows.Forms.ImageList(this.components);
             this.notifyIcon = new System.Windows.Forms.NotifyIcon(this.components);
             this.contextMenuStripNotifyIcon = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.startToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -114,7 +114,11 @@
             this.dataGridViewTextBoxColumn4 = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.logSplitter = new System.Windows.Forms.Splitter();
             this.startupPanel = new MobiFlight.UI.Panels.StartupPanel();
+            this.outputConfigPanel = new MobiFlight.UI.Panels.OutputConfigPanel();
+            this.inputConfigPanel = new MobiFlight.UI.Panels.InputConfigPanel();
             this.logPanel1 = new MobiFlight.UI.Panels.LogPanel();
+            this.hubHopToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.downloadPresetsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip.SuspendLayout();
             this.panelMain.SuspendLayout();
             this.inputsTabControl.SuspendLayout();
@@ -204,6 +208,7 @@
             // extrasToolStripMenuItem
             // 
             this.extrasToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.hubHopToolStripMenuItem,
             this.mSFS2020ToolStripMenuItem,
             this.orphanedSerialsFinderToolStripMenuItem,
             this.toolStripMenuItem4,
@@ -258,7 +263,8 @@
             this.openHubHopWebsiteToolStripMenuItem,
             this.openYoutubeChannelToolStripMenuItem,
             this.toolStripMenuItem1,
-            this.überToolStripMenuItem});
+            this.überToolStripMenuItem,
+            this.releaseNotesToolStripMenuItem});
             this.hilfeToolStripMenuItem.Name = "hilfeToolStripMenuItem";
             resources.ApplyResources(this.hilfeToolStripMenuItem, "hilfeToolStripMenuItem");
             // 
@@ -307,6 +313,12 @@
             resources.ApplyResources(this.überToolStripMenuItem, "überToolStripMenuItem");
             this.überToolStripMenuItem.Click += new System.EventHandler(this.AboutToolStripMenuItem_Click);
             // 
+            // releaseNotesToolStripMenuItem
+            // 
+            this.releaseNotesToolStripMenuItem.Name = "releaseNotesToolStripMenuItem";
+            resources.ApplyResources(this.releaseNotesToolStripMenuItem, "releaseNotesToolStripMenuItem");
+            this.releaseNotesToolStripMenuItem.Click += new System.EventHandler(this.releaseNotesToolStripMenuItem_Click);
+            // 
             // panelMain
             // 
             resources.ApplyResources(this.panelMain, "panelMain");
@@ -318,23 +330,20 @@
             this.inputsTabControl.Controls.Add(this.OutputTabPage);
             this.inputsTabControl.Controls.Add(this.InputTabPage);
             resources.ApplyResources(this.inputsTabControl, "inputsTabControl");
+            this.inputsTabControl.ImageList = this.tabPageImageList;
             this.inputsTabControl.Multiline = true;
             this.inputsTabControl.Name = "inputsTabControl";
             this.inputsTabControl.SelectedIndex = 0;
             this.inputsTabControl.SizeMode = System.Windows.Forms.TabSizeMode.FillToRight;
+            this.inputsTabControl.SelectedIndexChanged += new System.EventHandler(this.inputsTabControl_TabIndexChanged);
+            this.inputsTabControl.TabIndexChanged += new System.EventHandler(this.inputsTabControl_TabIndexChanged);
             // 
             // OutputTabPage
             // 
+            this.OutputTabPage.BackColor = System.Drawing.Color.Transparent;
             this.OutputTabPage.Controls.Add(this.outputConfigPanel);
             resources.ApplyResources(this.OutputTabPage, "OutputTabPage");
             this.OutputTabPage.Name = "OutputTabPage";
-            this.OutputTabPage.UseVisualStyleBackColor = true;
-            // 
-            // outputConfigPanel
-            // 
-            resources.ApplyResources(this.outputConfigPanel, "outputConfigPanel");
-            this.outputConfigPanel.ExecutionManager = null;
-            this.outputConfigPanel.Name = "outputConfigPanel";
             // 
             // InputTabPage
             // 
@@ -343,12 +352,14 @@
             this.InputTabPage.Name = "InputTabPage";
             this.InputTabPage.UseVisualStyleBackColor = true;
             // 
-            // inputConfigPanel
+            // tabPageImageList
             // 
-            resources.ApplyResources(this.inputConfigPanel, "inputConfigPanel");
-            this.inputConfigPanel.ExecutionManager = null;
-            this.inputConfigPanel.Name = "inputConfigPanel";
-            this.inputConfigPanel.OutputDataSetConfig = null;
+            this.tabPageImageList.ImageStream = ((System.Windows.Forms.ImageListStreamer)(resources.GetObject("tabPageImageList.ImageStream")));
+            this.tabPageImageList.TransparentColor = System.Drawing.Color.Transparent;
+            this.tabPageImageList.Images.SetKeyName(0, "mf-output.png");
+            this.tabPageImageList.Images.SetKeyName(1, "mf-output-inactive.png");
+            this.tabPageImageList.Images.SetKeyName(2, "mf-input.png");
+            this.tabPageImageList.Images.SetKeyName(3, "mf-input-inactive.png");
             // 
             // notifyIcon
             // 
@@ -699,10 +710,36 @@
             resources.ApplyResources(this.startupPanel, "startupPanel");
             this.startupPanel.Name = "startupPanel";
             // 
+            // outputConfigPanel
+            // 
+            resources.ApplyResources(this.outputConfigPanel, "outputConfigPanel");
+            this.outputConfigPanel.ExecutionManager = null;
+            this.outputConfigPanel.Name = "outputConfigPanel";
+            // 
+            // inputConfigPanel
+            // 
+            resources.ApplyResources(this.inputConfigPanel, "inputConfigPanel");
+            this.inputConfigPanel.ExecutionManager = null;
+            this.inputConfigPanel.Name = "inputConfigPanel";
+            this.inputConfigPanel.OutputDataSetConfig = null;
+            // 
             // logPanel1
             // 
             resources.ApplyResources(this.logPanel1, "logPanel1");
             this.logPanel1.Name = "logPanel1";
+            // 
+            // hubHopToolStripMenuItem
+            // 
+            this.hubHopToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.downloadPresetsToolStripMenuItem});
+            this.hubHopToolStripMenuItem.Name = "hubHopToolStripMenuItem";
+            resources.ApplyResources(this.hubHopToolStripMenuItem, "hubHopToolStripMenuItem");
+            // 
+            // downloadPresetsToolStripMenuItem
+            // 
+            this.downloadPresetsToolStripMenuItem.Name = "downloadPresetsToolStripMenuItem";
+            resources.ApplyResources(this.downloadPresetsToolStripMenuItem, "downloadPresetsToolStripMenuItem");
+            this.downloadPresetsToolStripMenuItem.Click += new System.EventHandler(this.downloadHubHopPresetsToolStripMenuItem_Click);
             // 
             // MainForm
             // 
@@ -834,6 +871,10 @@
         private Panels.LogPanel logPanel1;
         private System.Windows.Forms.ToolStripButton HubHopToolStripButton;
         private System.Windows.Forms.ToolStripMenuItem openHubHopWebsiteToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem releaseNotesToolStripMenuItem;
+        private System.Windows.Forms.ImageList tabPageImageList;
+        private System.Windows.Forms.ToolStripMenuItem hubHopToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem downloadPresetsToolStripMenuItem;
     }
 }
 

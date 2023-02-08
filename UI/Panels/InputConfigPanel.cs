@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MobiFlight.UI.Dialogs;
+using MobiFlight.Base;
 
 namespace MobiFlight.UI.Panels
 {
@@ -275,7 +276,7 @@ namespace MobiFlight.UI.Panels
                     dgv.BeginEdit(true);
                     if (e.KeyCode != Keys.F2)
                     {
-                        (dgv.EditingControl as TextBox).Text = (e.Shift) ? e.KeyCode.ToString() : e.KeyCode.ToString().ToLower();
+                        (dgv.EditingControl as TextBox).Text = (e.Shift || Control.IsKeyLocked(Keys.CapsLock)) ? e.KeyCode.ToString() : e.KeyCode.ToString().ToLower();
                         (dgv.EditingControl as TextBox).Select(1, 0);
                     }
                 }
@@ -358,9 +359,10 @@ namespace MobiFlight.UI.Panels
 
                 if ((inputsDataGridView.Rows[dgv.CurrentRow.Index].DataBoundItem as DataRowView).Row["description"] != null)
                 {
+                    bool Active = (bool)(inputsDataGridView.Rows[dgv.CurrentRow.Index].DataBoundItem as DataRowView).Row["active"];
                     String Description = (inputsDataGridView.Rows[dgv.CurrentRow.Index].DataBoundItem as DataRowView).Row["description"].ToString();
                     InputConfigItem cfg = ((inputsDataGridView.Rows[dgv.CurrentRow.Index].DataBoundItem as DataRowView).Row["settings"] as InputConfigItem);
-                    CopyToClipboard(Description, cfg);
+                    CopyToClipboard(Active, Description, cfg);
                 }
             }
             else
@@ -407,7 +409,8 @@ namespace MobiFlight.UI.Panels
                 if (cfg != null)
                 {
                     if (cfg.ModuleSerial == null) continue;
-                    row["moduleSerial"] = cfg.ModuleSerial.Split('/')[0];
+                    var serialNumber = SerialNumber.ExtractSerial(cfg.ModuleSerial);
+                    row["moduleSerial"] = SerialNumber.ExtractDeviceName(cfg.ModuleSerial);
 
                     if (cfg.Name=="") continue;
 
@@ -419,7 +422,18 @@ namespace MobiFlight.UI.Panels
                     else
                     if (cfg.Type == InputConfigItem.TYPE_INPUT_MULTIPLEXER) {
                         row["inputName"] = $"{cfg.Name}:{cfg.inputMultiplexer?.DataPin}";
-                    } 
+                    }
+                    else 
+                    if (Joystick.IsJoystickSerial(cfg.ModuleSerial)) {
+                        var j = ExecutionManager.GetJoystickManager().GetJoystickBySerial(serialNumber);
+                        if (j != null)
+                        {
+                            row["inputName"] = j.MapDeviceNameToLabel(cfg.Name);
+                        } else
+                        {
+                            row["inputName"] = cfg.Name;
+                        }
+                    }
                     else 
                     {
                         row["inputName"] = cfg.Name;
@@ -479,9 +493,10 @@ namespace MobiFlight.UI.Panels
                 if (row.IsNewRow) continue;
 
                 DataRow currentRow = (row.DataBoundItem as DataRowView).Row;
+                bool Active = (bool) currentRow["active"];
                 String Description = currentRow["description"] as String;
                 InputConfigItem cfg = currentRow["settings"] as InputConfigItem;
-                CopyToClipboard(Description, cfg);
+                CopyToClipboard(Active, Description, cfg);
                 return;
             }
         }
@@ -496,9 +511,10 @@ namespace MobiFlight.UI.Panels
             }
         }
 
-        private static void CopyToClipboard(string Description, InputConfigItem cfg)
+        private static void CopyToClipboard(bool Active, string Description, InputConfigItem cfg)
         {
             System.Windows.Forms.Clipboard.SetText(Description);
+            Clipboard.Instance.InputConfigActive = Active;
             Clipboard.Instance.InputConfigName = Description;
 
             if (cfg != null)
@@ -512,7 +528,7 @@ namespace MobiFlight.UI.Panels
             this.Validate();
             DataRow currentRow = inputsDataTable.NewRow();
             currentRow["guid"] = Guid.NewGuid();
-            currentRow["active"] = false;
+            currentRow["active"] = Clipboard.Instance.InputConfigActive;
 
             if (Clipboard.Instance.InputConfigName != null)
             {

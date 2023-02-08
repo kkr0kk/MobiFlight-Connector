@@ -2,9 +2,8 @@
   "$schema": "./mfboard.schema.json",
   "AvrDudeSettings": {
     "Device": "atmega2560",
-    "BaudRate": "115200",
+    "BaudRates": [ "115200" ],
     "Programmer": "wiring",
-    "FirmwareBaseName": "mobiflight_mega",
     "Timeout": 15000
   },
   "Connection": {
@@ -13,7 +12,7 @@
     "ForceResetOnFirmwareUpdate": false,
     "DelayAfterFirmwareUpdate": 0,
     "DtrEnable": true,
-    "MessageSize": 64,
+    "MessageSize": 90,
     "EEPROMSize": 1496
   },
   "HardwareIds": [
@@ -29,14 +28,19 @@
     "^VID_2341&PID_0242",
     "^VID_10C4&PID_EA60",
     "^VID_2341&PID_0044",
-    "^VID_3343&PID_0042"
+    "^VID_3343&PID_0042",
+    "^VID_04D9&PID_B534"
   ],
   "Info": {
     "CanInstallFirmware": true,
+    "CanResetBoard": true,
     "DelayAfterFirmwareUpdate": 0,
-    "LatestFirmwareVersion": "2.2.0",
+    "FirmwareBaseName": "mobiflight_mega",
+    "FirmwareExtension": "hex",
+    "LatestFirmwareVersion": "2.4.0",
     "FriendlyName": "Arduino Mega 2560",
-    "MobiFlightType": "MobiFlight Mega"
+    "MobiFlightType": "MobiFlight Mega",
+    "ResetFirmwareFile": "reset.arduino_mega_1_0_2.hex"
   },
   "ModuleLimits": {
     "MaxAnalogInputs": 16,
@@ -49,7 +53,7 @@
     "MaxServos": 10,
     "MaxShifters": 4,
     "MaxSteppers": 10,
-    "MaxInputMultiplexer": 2,
+    "MaxInputMultiplexer": 4
   },
   "Pins": [
     {

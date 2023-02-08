@@ -13,6 +13,8 @@ using MobiFlight.Config;
 using MobiFlight.OutputConfig;
 using MobiFlight.InputConfig;
 using MobiFlight.xplane;
+using System.Globalization;
+using Newtonsoft.Json.Linq;
 
 namespace MobiFlight
 {
@@ -259,6 +261,7 @@ namespace MobiFlight
         {
             simConnectCache.Start();
             xplaneCache.Start();
+            OnStartActions();
             timer.Enabled = true;
         }
 
@@ -269,6 +272,7 @@ namespace MobiFlight
             mobiFlightCache.Stop();
             simConnectCache.Stop();
             xplaneCache.Stop();
+            joystickManager.Stop();
             ClearErrorMessages();
         }
 
@@ -276,12 +280,12 @@ namespace MobiFlight
         {
             autoConnectTimer.Start();
             AutoConnectTimer_TickAsync(null, null);
-            Log.Instance.log("ExecutionManager.AutoConnectStart:" + "Started auto connect timer", LogSeverity.Debug);
+            Log.Instance.log("Started auto connect timer.", LogSeverity.Debug);
         }
 
         public void AutoConnectStop()
         {
-            Log.Instance.log("ExecutionManager.AutoConnectStop:" + "Stopped auto connect timer", LogSeverity.Debug);
+            Log.Instance.log("Stopped auto connect timer.", LogSeverity.Debug);
             autoConnectTimer.Stop();
         }
 
@@ -303,7 +307,7 @@ namespace MobiFlight
             testModeTimer.Enabled = true;
 
             OnTestModeStarted?.Invoke(this, null);
-            Log.Instance.log("ExecutionManager.TestModeStart:" + "Started test timer", LogSeverity.Info);
+            Log.Instance.log("Started test timer.", LogSeverity.Debug);
         }
 
         public void TestModeStop()
@@ -314,7 +318,8 @@ namespace MobiFlight
             mobiFlightCache.Stop();
             
             OnTestModeStopped?.Invoke(this, null);
-            Log.Instance.log("ExecutionManager.TestModeStop:" + "Stopped test timer", LogSeverity.Info);
+            Log.Instance.log("Stopped test timer.", LogSeverity.Debug);
+
         }
 
         public bool TestModeIsStarted()
@@ -373,7 +378,7 @@ namespace MobiFlight
 #if SIMCONNECT
             simConnectCache.Disconnect();
 #endif
-            joystickManager.Stop();
+            joystickManager.Shutdown();
             this.OnModulesDisconnected?.Invoke(this, new EventArgs());
         }
 
@@ -406,7 +411,7 @@ namespace MobiFlight
             // in fact I don't know if this needs to be done in C# 
             if (isExecuting)
             {
-                Log.Instance.log("ExecutionManager::ExecuteConfig() > Config execution taking too long, skipping execution.", LogSeverity.Warn);
+                Log.Instance.log("Config execution taking too long, skipping execution.", LogSeverity.Warn);
                 AppTelemetry.Instance.TrackSimpleEvent("SkippingExecuteConfig");
                 return;
             }
@@ -417,13 +422,18 @@ namespace MobiFlight
 #if ARCAZE
             arcazeCache.clearGetValues();
 #endif
-
             // iterate over the config row by row
             foreach (DataGridViewRow row in dataGridViewConfig.Rows)
             {
                 // ignore the rows that haven't been saved yet (new row, the last one in the grid)
                 // and the ones that are not checked active
-                if (row.IsNewRow || !(bool)row.Cells["active"].Value) continue;
+                if (row.IsNewRow) continue;
+
+                if (!(bool)row.Cells["active"].Value)
+                {
+                    row.ErrorText = "";
+                    continue;
+                }
 
                 // initialisiere den adapter
                 //// nimm type von col.type
@@ -442,18 +452,24 @@ namespace MobiFlight
                 if (cfg.SourceType == SourceType.FSUIPC && !fsuipcCache.IsConnected())
                 {
                     row.ErrorText = i18n._tr("uiMessageNoFSUIPCConnection");
-                }
+                } else 
 #if SIMCONNECT
                 // If not connected to SimConnect show an error message
                 if (cfg.SourceType == SourceType.SIMCONNECT && !simConnectCache.IsConnected())
                 {
                     row.ErrorText = i18n._tr("uiMessageNoSimConnectConnection");
                 }
+                else
 #endif
                 // If not connected to X-Plane show an error message
                 if (cfg.SourceType == SourceType.XPLANE && !xplaneCache.IsConnected())
                 {
-                    row.ErrorText = i18n._tr("uiMessageNoSimConnectConnection");
+                    row.ErrorText = i18n._tr("uiMessageNoXplaneConnection");
+                }
+                // In any other case remove the error message
+                else
+                {
+                    row.ErrorText = "";
                 }
 
                 ConnectorValue value = ExecuteRead(cfg);
@@ -464,25 +480,24 @@ namespace MobiFlight
                 row.Cells["fsuipcValueColumn"].Value = value.ToString();
                 row.Cells["fsuipcValueColumn"].Tag = value;
 
-                // only none string values get transformed
-                String strValue = "";
+                List<ConfigRefValue> configRefs = GetRefs(cfg.ConfigRefs);
+
                 try
                 {
-                    processedValue = ExecuteTransform(value, cfg);
-
-                    strValue = ExecuteComparison(processedValue, cfg);
+                    processedValue = value;
+                    foreach (var modifier in cfg.Modifiers.Items.Where(m => m.Active))
+                    {
+                        processedValue = modifier.Apply(processedValue, configRefs);
+                    }
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    Log.Instance.log($"Transform error ({row.Cells["Description"].Value}): {e.Message}", LogSeverity.Error);
-                    row.ErrorText = i18n._tr("uiMessageTransformError") + "(" + e.Message + ")";
+                    Log.Instance.log($"Transform error ({row.Cells["Description"].Value}): {ex.Message}", LogSeverity.Error);
+                    row.ErrorText = $"{i18n._tr("uiMessageTransformError")}({ex.Message})";
                     continue;
                 }
 
-                String strValueAfterComparison = (string)strValue.Clone();
-                strValue = ExecuteInterpolation(strValue, cfg);
-
-                row.Cells["arcazeValueColumn"].Value = strValue;
+                row.Cells["arcazeValueColumn"].Value = processedValue.ToString();
 
                 // check preconditions
                 if (!CheckPrecondition(cfg, processedValue))
@@ -494,7 +509,8 @@ namespace MobiFlight
                     }
                     else
                     {
-                        strValue = cfg.Preconditions.FalseCaseValue;
+                        processedValue.type = FSUIPCOffsetType.String;
+                        processedValue.String = cfg.Preconditions.FalseCaseValue;
                     }
                 }
                 else
@@ -505,16 +521,20 @@ namespace MobiFlight
 
                 try
                 {
-                    ExecuteDisplay(strValue, cfg);
+                    ExecuteDisplay(processedValue.ToString(), cfg);
+                }
+                catch(JoystickNotConnectedException jEx)
+                {
+                    row.ErrorText = jEx.Message;
                 }
                 catch (Exception exc)
                 {
                     String RowDescription = ((row.Cells["description"]).Value as String);
                     Exception resultExc = new ConfigErrorException(RowDescription + ". " + exc.Message, exc);
+                    row.ErrorText = exc.Message;
                     throw resultExc;
                 }
             }
-
             // this update will trigger potential writes to the offsets
             // that came from the inputs and are waiting to be written
             // fsuipcCache.Write();
@@ -522,16 +542,6 @@ namespace MobiFlight
             UpdateInputPreconditions();
 
             isExecuting = false;
-        }
-
-        private string ExecuteInterpolation(string strValue, OutputConfigItem cfg)
-        {
-            if (cfg.Interpolation.Count > 0 && cfg.Interpolation.Active)
-            {
-                strValue = Math.Round(cfg.Interpolation.Value(float.Parse(strValue)), 0).ToString();
-            }
-
-            return strValue;
         }
 
         private bool CheckPrecondition(IBaseConfigItem cfg, ConnectorValue currentValue)
@@ -545,7 +555,6 @@ namespace MobiFlight
             {
                 if (!p.PreconditionActive)
                 {
-                    //Log.Instance.log(p.PreconditionLabel + " inactive - skip!", LogSeverity.Debug);
                     continue;
                 }
 
@@ -555,42 +564,18 @@ namespace MobiFlight
                 {
 #if ARCAZE
                     case "pin":
-                        string serial = "";
-                        if (p.PreconditionSerial.Contains("/"))
-                        {
-                            serial = p.PreconditionSerial.Split('/')[1].Trim();
-                        };
+                        string serial = SerialNumber.ExtractSerial(p.PreconditionSerial);
+                        string val = arcazeCache.getValue(serial, p.PreconditionPin, "repeat");
 
-                        string val = arcazeCache.getValue(
-                                        serial,
-                                        p.PreconditionPin,
-                                        "repeat");
-
-                        connectorValue.type = FSUIPCOffsetType.Integer;
-                        connectorValue.Int64 = Int64.Parse(val);
-
-                        tmp = new OutputConfigItem();
-                        tmp.Comparison.Active = true;
-                        tmp.Comparison.Value = p.PreconditionValue;
-                        tmp.Comparison.Operand = "=";
-                        tmp.Comparison.IfValue = "1";
-                        tmp.Comparison.ElseValue = "0";
-
-                        try
-                        {
-
-                            String execResult = ExecuteComparison(connectorValue, tmp);
-                            //Log.Instance.log(p.PreconditionLabel + " - Pin - val:"+val+" - " + execResult + "==" + tmp.ComparisonIfValue, LogSeverity.Debug);
-                            result = (execResult == tmp.Comparison.IfValue);
-                        }
-                        catch (FormatException e)
-                        {
-                            Log.Instance.log("checkPrecondition : Exception on comparison execution, wrong format", LogSeverity.Error);
-                            // maybe it is a text string
-                            // @todo do something in the future here
-                        }
+                        result = p.Evaluate(val, currentValue);
                         break;
 #endif
+                    case "variable":
+                        var variableValue = mobiFlightCache.GetMobiFlightVariable(p.PreconditionRef);
+                        if (variableValue == null) break;
+
+                        result = p.Evaluate(variableValue);
+                        break;
                     case "config":
                         // iterate over the config row by row
                         foreach (DataGridViewRow row in dataGridViewConfig.Rows)
@@ -615,45 +600,7 @@ namespace MobiFlight
                             // we cannot compare
                             if (value == "") break;
 
-                            tmp = new OutputConfigItem();
-                            tmp.Comparison.Active = true;
-                            tmp.Comparison.Value = p.PreconditionValue.Replace("$", currentValue.ToString());
-                            if (tmp.Comparison.Value != p.PreconditionValue)
-                            {
-                                var ce = new NCalc.Expression(tmp.Comparison.Value);
-                                try
-                                {
-                                    tmp.Comparison.Value = (ce.Evaluate()).ToString();
-                                }
-                                catch (Exception exc)
-                                {
-                                    //argh!
-                                    Log.Instance.log("checkPrecondition : Exception on eval of comparison value", LogSeverity.Error);
-                                }
-                            }
-
-                            tmp.Comparison.Operand = p.PreconditionOperand;
-                            tmp.Comparison.IfValue = "1";
-                            tmp.Comparison.ElseValue = "0";
-
-                            connectorValue.type = FSUIPCOffsetType.Integer;
-                            if (!Int64.TryParse(value, out connectorValue.Int64))
-                            {
-                                // likely to be a string
-                                connectorValue.type = FSUIPCOffsetType.String;
-                                connectorValue.String = value;
-                            }
-
-                            try
-                            {
-                                result = (ExecuteComparison(connectorValue, tmp) == "1");
-                            }
-                            catch (FormatException e)
-                            {
-                                // maybe it is a text string
-                                // @todo do something in the future here
-                                Log.Instance.log("checkPrecondition : Exception on comparison execution, wrong format", LogSeverity.Error);
-                            }
+                            result = p.Evaluate(value, currentValue);
                             break;
                         }
                         break;
@@ -680,23 +627,11 @@ namespace MobiFlight
 
             if (cfg.SourceType == SourceType.FSUIPC)
             {
-                if (cfg.FSUIPC.OffsetType == FSUIPCOffsetType.String)
-                {
-                    result.type = FSUIPCOffsetType.String;
-                    result.String = fsuipcCache.getStringValue(cfg.FSUIPC.Offset, cfg.FSUIPC.Size);
-                }
-                else if (cfg.FSUIPC.OffsetType == FSUIPCOffsetType.Integer)
-                {
-                    result = ExecuteReadInt(cfg);
-                }
-                else if (cfg.FSUIPC.OffsetType == FSUIPCOffsetType.Float)
-                {
-                    result = ExecuteReadFloat(cfg);
-                }
+                result = FsuipcHelper.executeRead(cfg, fsuipcCache);
             }
             else if (cfg.SourceType == SourceType.VARIABLE)
             {
-                if (cfg.MobiFlightVariable.TYPE == MobiFlightVariable.TYPE_NUMBER) { 
+                if (cfg.MobiFlightVariable.TYPE == MobiFlightVariable.TYPE_NUMBER) {
                     result.type = FSUIPCOffsetType.Float;
                     result.Float64 = mobiFlightCache.GetMobiFlightVariable(cfg.MobiFlightVariable.Name).Number;
                 } else if (cfg.MobiFlightVariable.TYPE == MobiFlightVariable.TYPE_STRING)
@@ -716,223 +651,6 @@ namespace MobiFlight
                 result.Float64 = simConnectCache.GetSimVar(cfg.SimConnectValue.Value);
             }
 
-
-            return result;
-        }
-
-        private ConnectorValue ExecuteReadInt(OutputConfigItem cfg)
-        {
-            ConnectorValue result = new ConnectorValue();
-            switch (cfg.FSUIPC.Size)
-            {
-                case 1:
-                    Byte value8 = (Byte)(cfg.FSUIPC.Mask & fsuipcCache.getValue(
-                                                cfg.FSUIPC.Offset,
-                                                cfg.FSUIPC.Size
-                                              ));
-                    if (cfg.FSUIPC.BcdMode)
-                    {
-                        FsuipcBCD val = new FsuipcBCD() { Value = value8 };
-                        value8 = (Byte)val.asBCD;
-                    }
-
-                    result.type = FSUIPCOffsetType.Integer;
-                    result.Int64 = value8;
-                    break;
-                case 2:
-                    Int16 value16 = (Int16)(cfg.FSUIPC.Mask & fsuipcCache.getValue(
-                                                cfg.FSUIPC.Offset,
-                                                cfg.FSUIPC.Size
-                                              ));
-                    if (cfg.FSUIPC.BcdMode)
-                    {
-                        FsuipcBCD val = new FsuipcBCD() { Value = value16 };
-                        value16 = (Int16)val.asBCD;
-                    }
-
-                    result.type = FSUIPCOffsetType.Integer;
-                    result.Int64 = value16;
-                    break;
-                case 4:
-                    Int64 value32 = ((int)cfg.FSUIPC.Mask & fsuipcCache.getValue(
-                                                cfg.FSUIPC.Offset,
-                                                cfg.FSUIPC.Size
-                                              ));
-
-                    // no bcd support anymore for 4 byte
-
-                    result.type = FSUIPCOffsetType.Integer;
-                    result.Int64 = value32;
-                    break;
-                case 8:
-                    Double value64 = (Double)fsuipcCache.getDoubleValue(
-                                                cfg.FSUIPC.Offset,
-                                                cfg.FSUIPC.Size
-                                                );
-
-                    result.type = FSUIPCOffsetType.Float;
-                    result.Float64 = (int)(Math.Round(value64, 0));
-
-                    break;
-            }
-            return result;
-        }
-
-        private ConnectorValue ExecuteReadFloat(OutputConfigItem cfg)
-        {
-            ConnectorValue result = new ConnectorValue();
-            result.type = FSUIPCOffsetType.Float;
-            switch (cfg.FSUIPC.Size)
-            {
-                case 4:
-                    Double value32 = fsuipcCache.getFloatValue(
-                                                cfg.FSUIPC.Offset,
-                                                cfg.FSUIPC.Size
-                                              );
-
-                    result.Float64 = value32;
-                    break;
-                case 8:
-                    Double value64 = (Double)fsuipcCache.getDoubleValue(
-                                                cfg.FSUIPC.Offset,
-                                                cfg.FSUIPC.Size
-                                                );
-
-                    result.Float64 = value64;
-
-                    break;
-            }
-            return result;
-        }
-
-        private ConnectorValue ExecuteTransform(ConnectorValue value, OutputConfigItem cfg)
-        {
-            double tmpValue;
-            List<ConfigRefValue> configRefs = GetRefs(cfg.ConfigRefs);
-
-            switch (value.type)
-            {
-                case FSUIPCOffsetType.Integer:
-                    tmpValue = value.Int64;
-                    tmpValue = cfg.Transform.Apply(tmpValue, configRefs);
-                    value.Int64 = (Int64)Math.Floor(tmpValue);
-                    break;
-
-                /*case FSUIPCOffsetType.UnsignedInt:
-                    tmpValue = value.Uint64;
-                    tmpValue = tmpValue * cfg.FSUIPCMultiplier;
-                    value.Uint64 = (UInt64)Math.Floor(tmpValue);
-                    break;*/
-
-                case FSUIPCOffsetType.Float:
-                    value.Float64 = Math.Floor(cfg.Transform.Apply(value.Float64, configRefs));
-                    break;
-
-                case FSUIPCOffsetType.String:
-                    value.String = cfg.Transform.Apply(value.String);
-                    break;
-            }
-            return value;
-        }
-
-        private string ExecuteComparison(ConnectorValue connectorValue, OutputConfigItem cfg)
-        {
-            string result = null;
-            List<ConfigRefValue> configRefs = GetRefs(cfg.ConfigRefs);
-
-            if (connectorValue.type == FSUIPCOffsetType.String)
-            {
-                return ExecuteStringComparison(connectorValue, cfg);
-            }
-
-            Double value = connectorValue.Int64;
-            /*if (connectorValue.type == FSUIPCOffsetType.UnsignedInt) value = connectorValue.Uint64;*/
-            if (connectorValue.type == FSUIPCOffsetType.Float) value = connectorValue.Float64;
-
-            if (!cfg.Comparison.Active)
-            {
-                return value.ToString();
-            }
-
-            if (cfg.Comparison.Value == "")
-            {
-                return value.ToString();
-            }
-
-            Double comparisonValue = Double.Parse(cfg.Comparison.Value);
-            string comparisonIfValue = cfg.Comparison.IfValue != "" ? cfg.Comparison.IfValue : value.ToString();
-            string comparisonElseValue = cfg.Comparison.ElseValue != "" ? cfg.Comparison.ElseValue : value.ToString();
-
-            switch (cfg.Comparison.Operand)
-            {
-                case "!=":
-                    result = (value != comparisonValue) ? comparisonIfValue : comparisonElseValue;
-                    break;
-                case ">":
-                    result = (value > comparisonValue) ? comparisonIfValue : comparisonElseValue;
-                    break;
-                case ">=":
-                    result = (value >= comparisonValue) ? comparisonIfValue : comparisonElseValue;
-                    break;
-                case "<=":
-                    result = (value <= comparisonValue) ? comparisonIfValue : comparisonElseValue;
-                    break;
-                case "<":
-                    result = (value < comparisonValue) ? comparisonIfValue : comparisonElseValue;
-                    break;
-                case "=":
-                    result = (value == comparisonValue) ? comparisonIfValue : comparisonElseValue;
-                    break;
-                default:
-                    result = (value > 0) ? "1" : "0";
-                    break;
-            }
-
-            result = result.Replace("$", value.ToString());
-
-            foreach (ConfigRefValue configRef in configRefs)
-            {
-                result = result.Replace(configRef.ConfigRef.Placeholder, configRef.Value);
-            }
-                
-            try
-            {
-                var ce = new NCalc.Expression(result);
-                result = (ce.Evaluate()).ToString();
-            }
-            catch
-            {
-                if (Log.LooksLikeExpression(result))
-                    Log.Instance.log("ExecuteComparison : Exception on NCalc evaluate => " + result, LogSeverity.Warn);
-            }
-
-            return result;
-        }
-
-        private string ExecuteStringComparison(ConnectorValue connectorValue, OutputConfigItem cfg)
-        {
-            string result = connectorValue.String;
-            string value = connectorValue.String;
-
-            if (!cfg.Comparison.Active)
-            {
-                return connectorValue.String;
-            }
-
-            string comparisonValue = cfg.Comparison.Value;
-            string comparisonIfValue = cfg.Comparison.IfValue;
-            string comparisonElseValue = cfg.Comparison.ElseValue;
-
-            switch (cfg.Comparison.Operand)
-            {
-                case "!=":
-                    result = (value != comparisonValue) ? comparisonIfValue : comparisonElseValue;
-                    break;
-                case "=":
-                    result = (value == comparisonValue) ? comparisonIfValue : comparisonElseValue;
-                    break;
-            }
-
             return result;
         }
 
@@ -944,7 +662,21 @@ namespace MobiFlight
                 cfg.DisplayType!="InputAction") 
                 return value.ToString();
 
-            if (serial.IndexOf("SN") != 0 && cfg.DisplayType != "InputAction")
+            if (serial.IndexOf(Joystick.SerialPrefix)==0)
+            {
+                Joystick joystick = joystickManager.GetJoystickBySerial(serial);
+                if(joystick != null)
+                {
+                    joystick.SetOutputDeviceState(cfg.Pin.DisplayPin, value);
+                    joystick.UpdateOutputDeviceStates();
+                    joystick.Update();
+                } else
+                {
+                    var joystickName = SerialNumber.ExtractDeviceName(cfg.DisplaySerial);
+                    throw new JoystickNotConnectedException(i18n._tr($"{joystickName} not connected"));
+                }
+            }
+            else if (serial.IndexOf("SN") != 0 && cfg.DisplayType != "InputAction")
             {
 #if ARCAZE
                 switch (cfg.DisplayType)
@@ -980,12 +712,17 @@ namespace MobiFlight
                 switch (cfg.DisplayType)
                 {
                     case ArcazeLedDigit.TYPE:
+                        var decimalCount = value.Count(c => c=='.');
 
-
-                        var val = value.PadRight(cfg.LedModule.DisplayLedDigits.Count, cfg.LedModule.DisplayLedPaddingChar[0]);
+                        var val = value.PadRight(cfg.LedModule.DisplayLedDigits.Count + decimalCount, cfg.LedModule.DisplayLedPaddingChar[0]);
                         var decimalPoints = new List<string>(cfg.LedModule.DisplayLedDecimalPoints);
 
-                        if (cfg.LedModule.DisplayLedPadding) val = value.PadLeft(cfg.LedModule.DisplayLedPadding ? cfg.LedModule.DisplayLedDigits.Count : 0, cfg.LedModule.DisplayLedPaddingChar[0]);
+                        if (cfg.LedModule.DisplayLedPadding)
+                        {
+                            val = value.PadLeft(cfg.LedModule.DisplayLedPadding
+                                    ? cfg.LedModule.DisplayLedDigits.Count + decimalCount
+                                    : 0, cfg.LedModule.DisplayLedPaddingChar[0]);
+                        }
 
                         if (!string.IsNullOrEmpty(cfg.LedModule.DisplayLedBrightnessReference))
                         {
@@ -1029,9 +766,11 @@ namespace MobiFlight
                             serial,
                             cfg.Stepper.Address,
                             value,
-                            int.Parse(cfg.Stepper.InputRev),
-                            int.Parse(cfg.Stepper.OutputRev),
-                            cfg.Stepper.CompassMode
+                            cfg.Stepper.InputRev,
+                            cfg.Stepper.OutputRev,
+                            cfg.Stepper.CompassMode,
+                            cfg.Stepper.Speed,
+                            cfg.Stepper.Acceleration
                         );
                         break;
 
@@ -1225,7 +964,7 @@ namespace MobiFlight
             }
             catch (Exception ex)
             {
-                Log.Instance.log("Error on config execution. " + ex.Message, LogSeverity.Error);
+                Log.Instance.log($"Error on config execution: {ex.Message}", LogSeverity.Error);
                 isExecuting = false;
                 timer.Enabled = false;
             }
@@ -1279,7 +1018,7 @@ namespace MobiFlight
 #endif
                 )
             {
-                Log.Instance.log("ExecutionManager.autoConnectTimer_Tick(): AutoConnect Modules", LogSeverity.Debug);
+                Log.Instance.log("AutoConnect modules.", LogSeverity.Debug);
 #if ARCAZE
                 if (Properties.Settings.Default.ArcazeSupportEnabled)
                     arcazeCache.connect(); //  _initializeArcaze();
@@ -1299,7 +1038,7 @@ namespace MobiFlight
                         OnSimAvailable?.Invoke(FlightSim.FlightSimType, null);
                     }
 
-                    Log.Instance.log("ExecutionManager.autoConnectTimer_Tick(): AutoConnect Sim", LogSeverity.Debug);
+                    Log.Instance.log("AutoConnect sim.", LogSeverity.Debug);
 
                     if (!fsuipcCache.IsConnected())
                         fsuipcCache.Connect();
@@ -1320,7 +1059,7 @@ namespace MobiFlight
                         OnSimUnavailable?.Invoke(LastDetectedSim, null);
                         LastDetectedSim = FlightSim.FlightSimType;
                     }
-                    Log.Instance.log("ExecutionManager.autoConnectTimer_Tick(): No Sim running", LogSeverity.Debug);
+                    Log.Instance.log("No Sim running.", LogSeverity.Debug);
                 }
             }
 
@@ -1336,8 +1075,8 @@ namespace MobiFlight
         /// this is the test mode routine where we simply toggle output pins and displays to provide a way for checking if correct settings for display are used
         /// </summary>        
         /// <param name="sender"></param>
-        /// <param name="e"></param>
-        void testModeTimer_Tick(object sender, EventArgs e)
+        /// <param name="args"></param>
+        void testModeTimer_Tick(object sender, EventArgs args)
         {
             DataGridViewRow lastRow = dataGridViewConfig.Rows[(testModeIndex - 1 + dataGridViewConfig.RowCount) % dataGridViewConfig.RowCount];
 
@@ -1365,14 +1104,14 @@ namespace MobiFlight
                 catch (IndexOutOfRangeException ex)
                 {
                     String RowDescription = ((lastRow.DataBoundItem as DataRowView).Row["description"] as String);
-                    Log.Instance.log("Error Test Mode execution. Module not connected > " + RowDescription + ". " + ex.Message, LogSeverity.Error);
+                    Log.Instance.log($"Error during test mode execution: module not connected > {RowDescription}. {ex.Message}", LogSeverity.Error);
                     OnTestModeException(new Exception(i18n._tr("uiMessageTestModeModuleNotConnected")), new EventArgs());
                 }
                 catch (Exception ex)
                 {
                     // TODO: refactor - check if we can stop the execution and this way update the interface accordingly too
                     String RowDescription = ((lastRow.DataBoundItem as DataRowView).Row["description"] as String);
-                    Log.Instance.log("Error on Test Mode execution. " + RowDescription + ". " + ex.Message, LogSeverity.Error);
+                    Log.Instance.log($"Error during test mode execution: {RowDescription}. {ex.Message}", LogSeverity.Error);
                     OnTestModeException(ex, new EventArgs());
                 }
             }
@@ -1418,13 +1157,13 @@ namespace MobiFlight
                 catch (IndexOutOfRangeException ex)
                 {
                     String RowDescription = ((lastRow.DataBoundItem as DataRowView).Row["description"] as String);
-                    Log.Instance.log("Error Test Mode execution. Module not connected > " + RowDescription + ". " + ex.Message, LogSeverity.Error);
+                    Log.Instance.log($"Error during test mode execution: module not connected > {RowDescription}. {ex.Message}", LogSeverity.Error);
                     OnTestModeException(new Exception(i18n._tr("uiMessageTestModeModuleNotConnected")), new EventArgs());
                 }
                 catch (Exception ex)
                 {
                     String RowDescription = ((row.DataBoundItem as DataRowView).Row["description"] as String);
-                    Log.Instance.log("Error on TestMode execution. " + RowDescription + ". " + ex.Message, LogSeverity.Error);
+                    Log.Instance.log($"Error during test mode execution: {RowDescription}. {ex.Message}", LogSeverity.Error);
                     OnTestModeException(ex, new EventArgs());
                 }
             }
@@ -1473,7 +1212,7 @@ namespace MobiFlight
             switch (cfg.DisplayType)
             {
                 case MobiFlightStepper.TYPE:
-                    ExecuteDisplay((Int16.Parse(cfg.Stepper.TestValue)).ToString(), cfg);
+                    ExecuteDisplay(cfg.Stepper.TestValue.ToString(), cfg);
                     break;
 
                 case MobiFlightServo.TYPE:
@@ -1543,8 +1282,10 @@ namespace MobiFlight
             }
             else if (e.Type == DeviceType.AnalogInput)
             {
-                eventAction = MobiFlightAnalogInput.InputEventIdToString(0) + "=>" +e.Value;
+                eventAction = MobiFlightAnalogInput.InputEventIdToString(0) + " => " +e.Value;
             }
+
+            var msgEventLabel = $"{e.Name} => {e.DeviceLabel} {(e.ExtPin.HasValue ? $":{e.ExtPin}" : "")} => {eventAction}";
 
             lock (inputCache)
 			{
@@ -1565,7 +1306,14 @@ namespace MobiFlight
                         	// item currently created and not saved yet.
                         	if (cfg == null) continue;
                         
-                        	if (cfg.ModuleSerial != null && cfg.ModuleSerial.Contains("/ " + e.Serial) && cfg.Name == e.DeviceId)
+                        	if (cfg.ModuleSerial != null && 
+                                cfg.ModuleSerial.Contains("/ " + e.Serial) && 
+                               (cfg.Name == e.DeviceId || 
+                               // for backward compatibility we have to make this check
+                               // because we used to have the label in the config
+                               // but now we want to store the internal button identifier
+                               // so that the label can change any time without breaking the config
+                               (Joystick.IsJoystickSerial(cfg.ModuleSerial) && cfg.Name == e.DeviceLabel)))
                         	{
                             	// Input shift registers have an additional check to see if the pin that changed matches the pin
                             	// assigned to the row. If not just skip this row. Without this every row that uses the input shift register
@@ -1595,15 +1343,17 @@ namespace MobiFlight
             	if (inputCache[inputKey].Count == 0)
             	{
                 	if (LogIfNotJoystickOrJoystickAxisEnabled(e.Serial, e.Type))
-                    	    Log.Instance.log($"No config found for {e.Type}: {e.DeviceId}{(e.ExtPin.HasValue ? $":{e.ExtPin}" : "")} ({eventAction})@{e.Serial}", LogSeverity.Debug);
+                    	    Log.Instance.log($"{msgEventLabel} =>  No config found.", LogSeverity.Warn);
                 	return;
             	}
             }
 
-            Log.Instance.log($"Config found for {e.Type}: {e.DeviceId}{(e.ExtPin.HasValue ? $":{e.ExtPin}" : "")} ({eventAction})@{e.Serial}", LogSeverity.Debug);
-
             // Skip execution if not started
-            if (!IsStarted()) return;
+            if (!IsStarted())
+            {
+                Log.Instance.log($"{msgEventLabel} => Config not executed, MobiFlight not running", LogSeverity.Warn);
+                return;
+            }
 
             ConnectorValue currentValue = new ConnectorValue();
             CacheCollection cacheCollection = new CacheCollection()
@@ -1640,11 +1390,20 @@ namespace MobiFlight
                     }
                 }
 #if SIMCONNECT
-                tuple.Item1.execute(
-                    cacheCollection,
-                    e,
-                    GetRefs(tuple.Item1.ConfigRefs))
-                    ;
+                Log.Instance.log($"{msgEventLabel} => executing \"{row["description"]}\"", LogSeverity.Info);
+
+                try
+                {
+                    tuple.Item1.execute(
+                        cacheCollection,
+                        e,
+                        GetRefs(tuple.Item1.ConfigRefs))
+                        ;
+                }
+                catch (Exception ex)
+                {
+                    Log.Instance.log($"Error excuting \"{row["description"]}\": {ex.Message}", LogSeverity.Error);
+                }
 #endif
 
             }
@@ -1654,11 +1413,13 @@ namespace MobiFlight
 
         private void UpdateInputPreconditions()
         {
+            inputsDataGridView.SuspendLayout();
             foreach (DataGridViewRow gridViewRow in inputsDataGridView.Rows)
             {
                 try
                 {
                     if (gridViewRow.DataBoundItem == null) continue;
+                    if (!(bool)gridViewRow.Cells["inputActive"].Value) continue;
 
                     DataRowView rowView = gridViewRow.DataBoundItem as DataRowView;
                     InputConfigItem cfg = rowView.Row["settings"] as InputConfigItem;
@@ -1687,6 +1448,7 @@ namespace MobiFlight
                     continue;
                 }
             }
+            inputsDataGridView.ResumeLayout();
         }
 
         private bool LogIfNotJoystickOrJoystickAxisEnabled(String Serial, DeviceType type)
@@ -1721,6 +1483,22 @@ namespace MobiFlight
         public SimConnectCache GetSimConnectCache()
         {
             return simConnectCache;
+        }
+
+
+        private void OnStartActions()
+        {
+            if (Properties.Settings.Default.AutoRetrigger)
+            {
+                var action = new RetriggerInputAction();
+                action.execute(new CacheCollection()
+                {
+                    fsuipcCache = fsuipcCache,
+                    simConnectCache = simConnectCache,
+                    xplaneCache = xplaneCache,
+                    moduleCache = mobiFlightCache
+                }, null, null);
+            }            
         }
     }
 
